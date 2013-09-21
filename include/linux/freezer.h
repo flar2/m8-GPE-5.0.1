@@ -161,6 +161,15 @@ static inline int freezer_should_skip(struct task_struct *p)
 	__retval;							\
 })
 
+#define wait_event_freezable_exclusive(wq, condition)		\
+({									\
+	int __retval;							\
+	freezer_do_not_count();						\
+	__retval = wait_event_interruptible_exclusive(wq, condition);	\
+	freezer_count();						\
+	__retval;							\
+})
+
 #else /* !CONFIG_FREEZER */
 static inline bool frozen(struct task_struct *p) { return false; }
 static inline bool freezing(struct task_struct *p) { return false; }
