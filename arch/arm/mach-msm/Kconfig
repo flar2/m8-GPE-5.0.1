@@ -3133,3 +3133,9 @@ config HTC_MONITOR_SUBSYS_SLEEP_TIME
     bool "Monitor the sleep time of sub-system"
     help
         Support to monitor the sleep time of sub-system
+
+config MSM_SLEEPER
+    bool "Limit max frequency while screen is off"
+    default y
+    help
+      Limit max frequency while screen is off
