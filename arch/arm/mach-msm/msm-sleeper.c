@@ -22,10 +22,11 @@
 #include <mach/cpufreq.h>
 
 #define MSM_SLEEPER_MAJOR_VERSION	3
-#define MSM_SLEEPER_MINOR_VERSION	1
+#define MSM_SLEEPER_MINOR_VERSION	2
 
 extern uint32_t maxscroff;
 extern uint32_t maxscroff_freq;
+extern uint32_t ex_max_freq;
 static int limit_set = 0;
 
 static void msm_sleeper_suspend(void)
@@ -46,7 +47,7 @@ static void msm_sleeper_resume(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, MSM_CPUFREQ_NO_LIMIT);
+		msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, ex_max_freq);
 		//pr_info("Restore max frequency to %d\n", MSM_CPUFREQ_NO_LIMIT);
 	}
 	limit_set = 0;
