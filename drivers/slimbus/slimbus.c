@@ -588,7 +588,7 @@ EXPORT_SYMBOL(slim_report_absent);
 
 void slim_framer_booted(struct slim_controller *ctrl)
 {
-	struct slim_device *sbdev;
+	struct slim_device *sbdev = NULL;
 	struct list_head *pos, *next;
 	if (!ctrl)
 		return;
