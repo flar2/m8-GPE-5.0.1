@@ -1075,6 +1075,7 @@ static __ref int do_hotplug(void *data)
 		while (wait_for_completion_interruptible(
 			&hotplug_notify_complete) != 0)
 			;
+
 		INIT_COMPLETION(hotplug_notify_complete);
 		mask = 0;
 
@@ -1515,6 +1516,7 @@ static __ref int do_freq_mitigation(void *data)
 		while (wait_for_completion_interruptible(
 			&freq_mitigation_complete) != 0)
 			;
+
 		INIT_COMPLETION(freq_mitigation_complete);
 
 		for_each_possible_cpu(cpu) {

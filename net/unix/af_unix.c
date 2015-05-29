@@ -114,6 +114,7 @@
 #include <linux/mount.h>
 #include <net/checksum.h>
 #include <linux/security.h>
+#include <linux/freezer.h>
 
 struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 EXPORT_SYMBOL_GPL(unix_socket_table);
@@ -823,7 +824,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct dentry *dentry = NULL;
 	struct path path;
 	int err;
-	unsigned hash;
+	unsigned hash = 0;
 	struct unix_address *addr;
 	struct hlist_head *list;
 
@@ -963,7 +964,7 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
 	struct net *net = sock_net(sk);
 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
 	struct sock *other;
-	unsigned hash;
+	unsigned hash = 0;
 	int err;
 
 	if (addr->sa_family != AF_UNSPEC) {
@@ -1061,7 +1062,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *newsk = NULL;
 	struct sock *other = NULL;
 	struct sk_buff *skb = NULL;
-	unsigned hash;
+	unsigned hash = 0;
 	int st;
 	int err;
 	long timeo;
@@ -1445,7 +1446,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	struct sock *other = NULL;
 	int namelen = 0; /* fake GCC */
 	int err;
-	unsigned hash;
+	unsigned hash  = 0;
 	struct sk_buff *skb;
 	long timeo;
 	struct scm_cookie tmp_scm;
@@ -1882,7 +1883,7 @@ static long unix_stream_data_wait(struct sock *sk, long timeo)
 
 		set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 		unix_state_unlock(sk);
-		timeo = schedule_timeout(timeo);
+		timeo = freezable_schedule_timeout(timeo);
 		unix_state_lock(sk);
 		clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 	}

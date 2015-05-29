@@ -21,6 +21,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of.h>
 #include <linux/cpumask.h>
+#include <linux/cpufreq.h>
 
 #include <asm/cputype.h>
 
@@ -38,6 +39,42 @@
 #ifdef CONFIG_PERFLOCK
 #include <mach/perflock.h>
 #endif
+
+//elementalx
+unsigned long arg_cpu_oc = 0;
+static int arg_vdd_uv = 0;
+int pvs_number = 0;
+module_param(pvs_number, int, 0755); 
+
+static int __init cpufreq_read_cpu_oc(char *cpu_oc)
+{
+	unsigned long ui_khz;
+	int err;
+
+	err =  strict_strtoul(cpu_oc, 0, &ui_khz);
+	if (err)
+		arg_cpu_oc = 0;
+
+	arg_cpu_oc = ui_khz;
+	printk("elementalx: cpu_oc=%lu\n", arg_cpu_oc);
+	return 0;
+}
+__setup("cpu_oc=", cpufreq_read_cpu_oc);
+
+static int __init cpufreq_read_vdd_uv(char *vdd_uv)
+{
+	long arg, err;
+
+	err =  strict_strtol(vdd_uv, 0, &arg);
+	if (err)
+		arg_vdd_uv = 0;
+
+	arg_vdd_uv = arg;
+	printk("elementalx: vdd_uv=%d\n", arg_vdd_uv);
+	return 0;
+}
+__setup("vdd_uv=", cpufreq_read_vdd_uv);
+
 
 DEFINE_FIXED_DIV_CLK(hfpll_src_clk, 1, NULL);
 DEFINE_FIXED_DIV_CLK(acpu_aux_clk, 2, NULL);
@@ -470,8 +507,14 @@ static void get_krait_bin_format_b(struct platform_device *pdev,
 		break;
 	}
 
-	
 	if (pte_efuse & BIT(3)) {
+
+		//elementalx
+		if (arg_cpu_oc == 0 && *speed == 1)
+			arg_cpu_oc = 2265600;
+		else if (arg_cpu_oc == 0 && *speed == 3)
+			arg_cpu_oc = 2457600;
+					
 		dev_info(&pdev->dev, "Speed bin: %d\n", *speed);
 	} else {
 		dev_warn(&pdev->dev, "Speed bin not set. Defaulting to 0!\n");
@@ -481,6 +524,10 @@ static void get_krait_bin_format_b(struct platform_device *pdev,
 	
 	pte_efuse = readl_relaxed(base + 0x4) & BIT(21);
 	if (pte_efuse) {
+
+		//elementalx
+		pvs_number = *pvs;
+
 		dev_info(&pdev->dev, "PVS bin: %d\n", *pvs);
 	} else {
 		dev_warn(&pdev->dev, "PVS bin not set. Defaulting to 0!\n");
@@ -645,6 +692,19 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 		for (i = 0; i < num; i++)
 			uv[i] += boost_uv;
 	}
+
+	switch (arg_vdd_uv) {
+
+	case 1:
+		uv[1] -= 15000;
+		break;
+	case 2:
+		uv[1] -= 30000;
+		break;
+	case 3:
+		uv[1] -= 45000;
+		break;
+	}
 }
 
 static char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
@@ -652,14 +712,82 @@ module_param_string(table_name, table_name, sizeof(table_name), S_IRUGO);
 static unsigned int pvs_config_ver;
 module_param(pvs_config_ver, uint, S_IRUGO);
 
+#ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
+#define CPU_VDD_MAX	1200
+#define CPU_VDD_MIN	600
+
+extern int use_for_scaling(unsigned int freq);
+static unsigned int cnt;
+
+ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
+			 char *buf)
+{
+	int i, freq, len = 0;
+	unsigned int cpu = 0;
+	unsigned int num_levels = cpu_clk[cpu]->vdd_class->num_levels;
+
+	if (!buf)
+		return -EINVAL;
+
+	for (i = 0; i < num_levels; i++) {
+		freq = use_for_scaling(cpu_clk[cpu]->fmax[i] / 1000);
+		if (freq < 0)
+			continue;
+
+		len += sprintf(buf + len, "%dmhz: %u mV\n", freq / 1000,
+			       cpu_clk[cpu]->vdd_class->vdd_uv[i] / 1000);
+	}
+
+	return len;
+}
+
+ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
+			  char *buf, size_t count)
+{
+	int i, j;
+	int ret = 0;
+	unsigned int val, cpu = 0;
+	unsigned int num_levels = cpu_clk[cpu]->vdd_class->num_levels;
+	char size_cur[4];
+
+	if (cnt) {
+		cnt = 0;
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_levels; i++) {
+		if (use_for_scaling(cpu_clk[cpu]->fmax[i] / 1000) < 0)
+			continue;
+
+		ret = sscanf(buf, "%u", &val);
+		if (!ret)
+			return -EINVAL;
+
+		if (val > CPU_VDD_MAX)
+			val = CPU_VDD_MAX;
+		else if (val < CPU_VDD_MIN)
+			val = CPU_VDD_MIN;
+
+		for (j = 0; j < NR_CPUS; j++)
+			cpu_clk[j]->vdd_class->vdd_uv[i] = val * 1000;
+
+		ret = sscanf(buf, "%s", size_cur);
+		cnt = strlen(size_cur);
+		buf += cnt + 1;
+	}
+
+	return ret;
+}
+#endif
+
 static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct clk *c;
 	int speed, pvs, pvs_ver, config_ver, rows, cpu;
-	unsigned long *freq, cur_rate, aux_rate;
-	int *uv, *ua;
-	u32 *dscr, vco_mask, config_val;
+	unsigned long *freq = 0, cur_rate, aux_rate;
+	int *uv = 0, *ua = 0;
+	u32 *dscr = 0, vco_mask, config_val;
 	int ret;
 
 	vdd_l2.regulator[0] = devm_regulator_get(dev, "l2-dig");

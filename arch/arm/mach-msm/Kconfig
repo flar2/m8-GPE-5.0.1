@@ -1971,6 +1971,12 @@ config MSM_DEVFREQ_CPUBW
 	  agnostic interface to so that some of the devfreq governors can be
 	  shared across SoCs.
 
+config MSM_CPU_VOLTAGE_CONTROL
+	bool "Userspace CPU Voltage Control"
+	default y
+	help
+	  This enables userspace CPU Voltage Control.
+
 config MSM_AVS_HW
 	bool "Enable Adaptive Voltage Scaling (AVS)"
 	default n
@@ -3078,6 +3084,13 @@ config MSM_CPU_PWRCTL
 	  stand alone power collapse operation. Selecting this option
 	  ensures that they are always off.
 
+config FORCE_FAST_CHARGE
+	bool "Increase input current limit to 1100mA when charging via USB"
+	default y
+	help
+	  A simple sysfs interface to increase input current limit to
+	  1100mA when charging via USB.
+
 config MSM_UARTDM_Core_v14
 	bool "Use MSM BLSP based HSUART Core v1.4"
 	depends on SERIAL_MSM_HS
@@ -3182,3 +3195,9 @@ config HTC_MONITOR_SUBSYS_SLEEP_TIME
     bool "Monitor the sleep time of sub-system"
     help
         Support to monitor the sleep time of sub-system
+
+config MSM_SLEEPER
+    bool "Limit max frequency while screen is off"
+    default y
+    help
+      Limit max frequency while screen is off
