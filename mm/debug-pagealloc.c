@@ -17,6 +17,14 @@
 #define mark_addr_rdwrite(a)
 #endif
 
+#ifndef mark_addr_rdonly
+#define mark_addr_rdonly(a)
+#endif
+
+#ifndef mark_addr_rdwrite
+#define mark_addr_rdwrite(a)
+#endif
+
 static inline void set_page_poison(struct page *page)
 {
 	__set_bit(PAGE_DEBUG_FLAG_POISON, &page->debug_flags);
@@ -156,7 +164,7 @@ void htc_trace_pages_user(struct page *page, int numpages, int free)
 #else
 static inline
 void htc_trace_pages_user(struct page *page, int numpages, int free) { }
-#endif 
+#endif /* CONFIG_HTC_DEBUG_PAGE_USER_TRACE */
 
 void kernel_map_pages(struct page *page, int numpages, int enable)
 {

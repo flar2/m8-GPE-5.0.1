@@ -268,9 +268,9 @@ static void wait_on_retry_sync_kiocb(struct kiocb *iocb)
 }
 
 static struct fs_dbg_threshold dbg_threshold[] = {
-	{ 52428800, "read"}, 
-	{ 31457280, "write"}, 
-	{ 104857600, "erase"}, 
+	{ 10485760, "read"}, 
+	{ 10485760, "write"}, 
+	{ 10485760, "erase"}, 
 };
 static void check_dbg_threshold(struct task_io_accounting *acc,
 	struct fs_dbg_threshold *thresh, int type)

@@ -697,5 +697,6 @@ void msm_snddev_tx_route_deconfig(void);
 extern phys_addr_t msm_shared_ram_phys; 
 
 extern int get_partition_num_by_name(char *name);
+
 u32 wcnss_rf_read_reg(u32 rf_reg_addr);
 #endif

@@ -1511,6 +1511,7 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 
 	u16 port_id = 0;
 	msm_mi2s_get_port_id(dai->id, substream->stream, &port_id);
+
 	dai_data->channels = params_channels(params);
 	switch (dai_data->channels) {
 	case 8:
@@ -1582,7 +1583,7 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 	default:
 		return -EINVAL;
 	}
-	pr_info("%s: port id 0x%x bit_width %d\n",__func__,port_id,dai_data->bitwidth);
+
 	pr_info("%s: port id 0x%x bit_width %d\n",__func__,port_id,dai_data->bitwidth);
 	dai_data->port_config.i2s.i2s_cfg_minor_version =
 			AFE_API_VERSION_I2S_CONFIG;

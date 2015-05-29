@@ -15,6 +15,7 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/scatterlist.h>
+#include <linux/bitops.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -68,12 +69,12 @@ static int sd_queue_thread(void *d)
 		if (req || mq->mqrq_prev->req) {
 			set_current_state(TASK_RUNNING);
 			mq->issue_fn(mq, req);
-			if (mq->flags & MMC_QUEUE_NEW_REQUEST) {
+			if (test_bit(MMC_QUEUE_NEW_REQUEST, &mq->flags)) {
 				continue; 
-			} else if ((mq->flags & MMC_QUEUE_URGENT_REQUEST) &&
-				   (mq->mqrq_cur->req &&
-				!(mq->mqrq_cur->req->cmd_flags &
-				       MMC_REQ_NOREINSERT_MASK))) {
+			} else if (test_bit(MMC_QUEUE_URGENT_REQUEST,
+					&mq->flags) && (mq->mqrq_cur->req &&
+					!(mq->mqrq_cur->req->cmd_flags &
+						MMC_REQ_NOREINSERT_MASK))) {
 				mq->mqrq_cur->brq.mrq.data = NULL;
 				mq->mqrq_cur->req = NULL;
 			}
@@ -123,10 +124,10 @@ static int mmc_queue_thread(void *d)
 		if (req || mq->mqrq_prev->req) {
 			set_current_state(TASK_RUNNING);
 			mq->issue_fn(mq, req);
-			if (mq->flags & MMC_QUEUE_NEW_REQUEST) {
+			if (test_bit(MMC_QUEUE_NEW_REQUEST, &mq->flags)) {
 				continue; 
-			} else if ((mq->flags & MMC_QUEUE_URGENT_REQUEST) &&
-				   (mq->mqrq_cur->req &&
+			} else if (test_bit(MMC_QUEUE_URGENT_REQUEST,
+				&mq->flags) && (mq->mqrq_cur->req &&
 				!(mq->mqrq_cur->req->cmd_flags &
 				       MMC_REQ_NOREINSERT_MASK))) {
 				mq->mqrq_cur->brq.mrq.data = NULL;
@@ -504,16 +505,14 @@ int mmc_queue_suspend(struct mmc_queue *mq, int wait)
 	unsigned long flags;
 	int rc = 0;
 
-	if (!(mq->flags & MMC_QUEUE_SUSPENDED)) {
-		mq->flags |= MMC_QUEUE_SUSPENDED;
-
+	if (!(test_and_set_bit(MMC_QUEUE_SUSPENDED, &mq->flags))) {
 		spin_lock_irqsave(q->queue_lock, flags);
 		blk_stop_queue(q);
 		spin_unlock_irqrestore(q->queue_lock, flags);
 
 		rc = down_trylock(&mq->thread_sem);
 		if (rc && !wait) {
-			mq->flags &= ~MMC_QUEUE_SUSPENDED;
+			clear_bit(MMC_QUEUE_SUSPENDED, &mq->flags);
 			spin_lock_irqsave(q->queue_lock, flags);
 			blk_start_queue(q);
 			spin_unlock_irqrestore(q->queue_lock, flags);
@@ -531,8 +530,7 @@ void mmc_queue_resume(struct mmc_queue *mq)
 	struct request_queue *q = mq->queue;
 	unsigned long flags;
 
-	if (mq->flags & MMC_QUEUE_SUSPENDED) {
-		mq->flags &= ~MMC_QUEUE_SUSPENDED;
+	if (test_and_clear_bit(MMC_QUEUE_SUSPENDED, &mq->flags)) {
 
 		up(&mq->thread_sem);
 

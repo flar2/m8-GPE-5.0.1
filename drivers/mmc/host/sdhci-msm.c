@@ -319,7 +319,6 @@ struct sdhci_msm_host {
 	struct device_attribute	polling;
 	u32 clk_rate; 
 
-	struct proc_dir_entry	*bkops_proc;
 	struct proc_dir_entry	*speed_class;
 	struct proc_dir_entry	*sd_tray_state;
 	bool tuning_done;
@@ -2667,42 +2666,6 @@ struct t_cable_status_notifier ac_cable_status_notifier = {
 	.func = ac_cable_status_notifier_func,
 };
 
-static int sdhci_proc_bkops_show(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	struct sdhci_host *host = (struct sdhci_host*) data;
-	struct mmc_host *mmc = host->mmc;
-
-	if (!mmc || !mmc->card)
-		return 0;
-
-	return sprintf(page, "%d", mmc_card_need_bkops_in_suspend(mmc->card) ? 1 : 0);
-}
-
-static int sdhci_proc_bkops_set(struct file *file, const char __user *buffer,
-		unsigned long count, void *data)
-{
-#ifdef CONFIG_MMC_NEED_BKOPS_IN_SUSPEND
-	struct sdhci_host *host = (struct sdhci_host*) data;
-	struct mmc_host *mmc = host->mmc;
-	unsigned long flags;
-	int value;
-
-	if (!mmc || !mmc->card)
-		return count;
-
-	sscanf(buffer, "%d", &value);
-	spin_lock_irqsave(&mmc->lock, flags);
-	if (value) {
-		pr_info("%s: force bkops\n", __func__);
-		mmc_card_set_need_bkops_in_suspend(mmc->card);
-	}
-	spin_unlock_irqrestore(&mmc->lock, flags);
-#endif
-
-	return count;
-}
-
 static int sdhci_proc_speed_class(char *page, char **start, off_t off,
                int count, int *eof, void *data)
 {
@@ -3025,7 +2988,7 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
 	msm_host->mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC |
 				MMC_CAP2_DETECT_ON_ERR);
-	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
+	
 	msm_host->mmc->caps2 |= MMC_CAP2_CACHE_CTRL;
 	
 	
@@ -3115,18 +3078,6 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	else if (mmc_use_core_runtime_pm(host->mmc))
 		pm_runtime_enable(&pdev->dev);
 
-	if (is_mmc_platform(msm_host->pdata) &&
-			(msm_host->mmc->caps2 & MMC_CAP2_INIT_BKOPS)) {
-		msm_host->bkops_proc = create_proc_entry("emmc_bkops", 0664, NULL);
-		if (msm_host->bkops_proc) {
-			msm_host->bkops_proc->read_proc = sdhci_proc_bkops_show;
-			msm_host->bkops_proc->write_proc = sdhci_proc_bkops_set;
-			msm_host->bkops_proc->data = (void *) host;
-		} else
-			pr_warning("%s: Failed to create emmc_bkops entry\n",
-					mmc_hostname(host->mmc));
-
-	}
 	if(is_sd_platform(msm_host->pdata)) {
 			msm_host->speed_class = create_proc_entry("sd_speed_class", 0444, NULL);
 			if (msm_host->speed_class) {
@@ -3358,42 +3309,6 @@ skip_enable_host_irq:
 
 #ifdef CONFIG_PM_SLEEP
 
-#ifdef CONFIG_MMC_NEED_BKOPS_IN_SUSPEND
-static int sdhci_msm_prepare(struct device *dev)
-{
-	struct sdhci_host *host = dev_get_drvdata(dev);
-	struct mmc_host *mmc = host->mmc;
-
-	if (!mmc->card)
-		return 0;
-
-	if (mmc_card_need_bkops_in_suspend(mmc->card) &&
-			!mmc_card_doing_bkops(mmc->card))
-		mmc_card_start_bkops(mmc->card);
-
-	return 0;
-}
-
-static void sdhci_msm_complete(struct device *dev)
-{
-	struct sdhci_host *host = dev_get_drvdata(dev);
-	struct mmc_host *mmc = host->mmc;
-	unsigned long flags;
-
-	if (!mmc->card)
-		return;
-
-	if (mmc_card_need_bkops_in_suspend(mmc->card)) {
-		mmc_card_stop_bkops(mmc->card);
-		spin_lock_irqsave(&mmc->lock, flags);
-		mmc_card_clr_need_bkops_in_suspend(mmc->card);
-		spin_unlock_irqrestore(&mmc->lock, flags);
-	}
-
-	return;
-}
-#endif
-
 static int sdhci_msm_suspend(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
@@ -3465,10 +3380,6 @@ static const struct dev_pm_ops sdhci_msm_pmops = {
 	SET_SYSTEM_SLEEP_PM_OPS(sdhci_msm_suspend, sdhci_msm_resume)
 	SET_RUNTIME_PM_OPS(sdhci_msm_runtime_suspend, sdhci_msm_runtime_resume,
 			   NULL)
-#ifdef CONFIG_MMC_NEED_BKOPS_IN_SUSPEND
-	.prepare = sdhci_msm_prepare,
-	.complete = sdhci_msm_complete,
-#endif
 	.suspend_noirq = sdhci_msm_suspend_noirq,
 };
 

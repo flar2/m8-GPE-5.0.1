@@ -52,6 +52,7 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
 
+#include "dwc3-msm.h"
 #include "core.h"
 #include "gadget.h"
 #include "debug.h"
@@ -1551,14 +1552,17 @@ static int dwc3_gadget_vbus_draw(struct usb_gadget *g, unsigned mA)
 	return -ENOTSUPP;
 }
 
+bool disable_during_lpm = false;
 static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 {
 	struct dwc3		*dwc = gadget_to_dwc(g);
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
 	unsigned long		flags;
 	int			ret;
+	unsigned long           timeout;
 
 	is_on = !!is_on;
-	printk(KERN_INFO "[USB] %s %d\n",__func__,is_on);
+	printk(KERN_INFO "[USB] %s %d ++\n",__func__,is_on);
 
 	
 	g->ats_reset_irq_count	= 0;
@@ -1579,6 +1583,42 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 
 		return 0;
 	}
+
+	spin_unlock_irqrestore(&dwc->lock, flags);
+	if (atomic_read(&mdwc->in_lpm) && !is_on) {
+		printk(KERN_INFO "[USB] %s disable during LPM, resume usb controller.\n",__func__);
+		dbg_event(0xFF, "Gdgpull gsyn", 0);
+		pm_runtime_get_sync(dwc->dev);
+		disable_during_lpm = true;
+		goto set_run_stop;
+	}
+
+	if (is_on && disable_during_lpm) {
+		printk(KERN_INFO "[USB] %s previous disable during LPM, put usb controller to idle.\n",__func__);
+		dbg_event(0xFF, "Gdgpull psyn", 0);
+		pm_runtime_put_sync(dwc->dev);
+		disable_during_lpm = false;
+		goto set_run_stop;
+	}
+
+	if (atomic_read(&mdwc->in_lpm)) {
+		printk(KERN_INFO "[USB] %s resume usb controller from LPM\n",__func__);
+		pm_runtime_resume(dwc->dev);
+		timeout = jiffies + msecs_to_jiffies(20);
+		do {
+			if (!atomic_read(&mdwc->in_lpm))
+				break;
+
+			if (time_after(jiffies, timeout)) {
+				pr_err("%s(): Err getting pullup\n", __func__);
+				return -ETIMEDOUT;
+			}
+			usleep_range(2, 5);
+		} while (true);
+	}
+
+set_run_stop:
+	spin_lock_irqsave(&dwc->lock, flags);
 #ifdef CONFIG_HTC_USB_DEBUG_FLAG
 	dbg_event(0xFF, "RUNSTOP",0);
 #endif
@@ -1950,6 +1990,9 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 		pr_info("endpoint.desc is null\n");
 		return 1;
 	}
+
+	dwc->gadget.xfer_isr_count++;
+
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
 			list_empty(&dep->req_queued)) {
 		if (list_empty(&dep->request_list))
@@ -2108,6 +2151,7 @@ static void dwc3_disconnect_gadget(struct dwc3 *dwc,int mute)
 		}
 		spin_lock(&dwc->lock);
 	}
+	dwc->gadget.xfer_isr_count = 0;
 }
 
 static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum)
@@ -2385,9 +2429,13 @@ static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc)
 {
 	dev_vdbg(dwc->dev, "%s\n", __func__);
 
+	
+	if (dwc->link_state == DWC3_LINK_STATE_U3) {
+		dbg_event(0xFF, "WAKEUP", 0);
+		dwc->gadget_driver->resume(&dwc->gadget);
+	}
 
-	dbg_event(0xFF, "WAKEUP", 0);
-	dwc->gadget_driver->resume(&dwc->gadget);
+	dwc->link_state = DWC3_LINK_STATE_U0;
 }
 
 static void dwc3_gadget_linksts_change_interrupt(struct dwc3 *dwc,

@@ -370,6 +370,8 @@ static void rndis_response_available(void *_rndis)
 	if (atomic_inc_return(&rndis->notify_count) != 1)
 		return;
 
+	if (!rndis->notify->driver_data)
+		return;
 	data[0] = cpu_to_le32(1);
 	data[1] = cpu_to_le32(0);
 

@@ -106,6 +106,7 @@ obj-$(CONFIG_MSM_FIQ_SUPPORT) += fiq_glue.o
 obj-$(CONFIG_MACH_TROUT) += board-trout-rfkill.o
 obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
 obj-$(CONFIG_MSM_SMD_LOGGING) += smem_log.o
+obj-$(CONFIG_MSM_COMMON_LOG) += common_log.o
 obj-$(CONFIG_MSM_IPC_LOGGING) += ipc_logging.o
 ifdef CONFIG_DEBUG_FS
 obj-$(CONFIG_MSM_IPC_LOGGING) += ipc_logging_debug.o
@@ -285,13 +286,13 @@ obj-$(CONFIG_ARCH_MSM8974) += clock-local2.o clock-pll.o clock-8974.o clock-rpm.
 obj-$(CONFIG_ARCH_MSM8974) += devices_cmdline.o devices_dtb.o
 obj-$(CONFIG_ARCH_MSM8974) += gdsc.o
 obj-$(CONFIG_ARCH_MSM9625) += gdsc.o
-obj-$(CONFIG_ARCH_DUMMY) += gdsc.o devices_dtb.o devices_cmdline.o
+obj-$(CONFIG_ARCH_MSM8226) += gdsc.o devices_dtb.o devices_cmdline.o
 obj-$(CONFIG_ARCH_MSM8610) += gdsc.o
 obj-$(CONFIG_ARCH_MPQ8092) += gdsc.o
 obj-$(CONFIG_ARCH_APQ8084) += gdsc.o
 obj-$(CONFIG_KRAIT_REGULATOR) += krait-regulator.o  krait-regulator-pmic.o
 obj-$(CONFIG_ARCH_MSM8974) += htc_awb_cal.o
-obj-$(CONFIG_ARCH_DUMMY) += htc_awb_cal.o
+obj-$(CONFIG_ARCH_MSM8226) += htc_awb_cal.o
 ifdef CONFIG_BT
   obj-$(CONFIG_ARCH_MSM8974) += htc_bdaddress.o
 endif #CONFIG_BT
@@ -301,20 +302,16 @@ obj-$(CONFIG_ARCH_MSM9625) += board-9625.o board-9625-gpiomux.o
 obj-$(CONFIG_ARCH_MSM9625) += clock-local2.o clock-pll.o clock-9625.o clock-rpm.o clock-voter.o acpuclock-9625.o acpuclock-cortex.o
 obj-$(CONFIG_ARCH_MPQ8092) += board-8092.o board-8092-gpiomux.o
 obj-$(CONFIG_ARCH_MPQ8092) += clock-8092.o
-obj-$(CONFIG_ARCH_DUMMY) += board-8226.o board-8226-gpiomux.o htc_wifi_nvs.o
+obj-$(CONFIG_ARCH_MSM8226) += board-8226.o board-8226-gpiomux.o htc_wifi_nvs.o
 ifdef CONFIG_BT
-  obj-$(CONFIG_ARCH_DUMMY) += htc_bdaddress.o
+  obj-$(CONFIG_ARCH_MSM8226) += htc_bdaddress.o
 endif #CONFIG_BT
-obj-$(CONFIG_ARCH_DUMMY) += board-htc-8x26.o htc_acoustic_alsa.o
-obj-$(CONFIG_ARCH_DUMMY) += board-8226-audio.o
-obj-$(CONFIG_MACH_MEM_UL) += board-mem-audio-amp.o
-obj-$(CONFIG_MACH_A5_UL) += board-afe-audio-amp.o
-obj-$(CONFIG_MACH_A5_DWG) += board-afe-audio-amp.o
-obj-$(CONFIG_MACH_A5_TL) += board-afe-audio-amp.o
-obj-$(CONFIG_ARCH_DUMMY) += board-8226.o board-8226-gpiomux.o
-obj-$(CONFIG_ARCH_DUMMY) += clock-local2.o clock-pll.o clock-8226.o clock-rpm.o clock-voter.o clock-mdss-8974.o
-obj-$(CONFIG_ARCH_DUMMY) += acpuclock-8226.o acpuclock-cortex.o
-obj-$(CONFIG_ARCH_DUMMY) += devices_cmdline.o devices_dtb.o
+obj-$(CONFIG_ARCH_MSM8226) += board-htc-8x26.o htc_acoustic_alsa.o
+obj-$(CONFIG_ARCH_MSM8226) += board-8226-audio.o
+obj-$(CONFIG_ARCH_MSM8226) += board-8226.o board-8226-gpiomux.o
+obj-$(CONFIG_ARCH_MSM8226) += clock-local2.o clock-pll.o clock-8226.o clock-rpm.o clock-voter.o clock-mdss-8974.o
+obj-$(CONFIG_ARCH_MSM8226) += acpuclock-8226.o acpuclock-cortex.o
+obj-$(CONFIG_ARCH_MSM8226) += devices_cmdline.o devices_dtb.o
 obj-$(CONFIG_ARCH_MSM8610) += board-8610.o board-8610-gpiomux.o
 obj-$(CONFIG_ARCH_MSM8610) += clock-local2.o clock-pll.o clock-8610.o clock-rpm.o clock-voter.o
 obj-$(CONFIG_ARCH_MSM8610) += acpuclock-8226.o acpuclock-cortex.o
@@ -385,7 +382,7 @@ obj-$(CONFIG_ARCH_MSM9625) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_MSMKRYPTON) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_MSMSAMARIUM) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_MPQ8092) += gpiomux-v2.o gpiomux.o
-obj-$(CONFIG_ARCH_DUMMY) += gpiomux-v2.o gpiomux.o
+obj-$(CONFIG_ARCH_MSM8226) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_MSM8610) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_APQ8084) += gpiomux-v2.o gpiomux.o
 obj-$(CONFIG_ARCH_FSM9900) += gpiomux-v2.o gpiomux.o
@@ -450,8 +447,9 @@ obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
 
 obj-y += display/
 obj-$(CONFIG_ARCH_MSM8974) += board-htc-8974.o htc_acoustic_alsa.o
-obj-$(CONFIG_ARCH_DUMMY) += htc_acoustic_alsa.o
+obj-$(CONFIG_ARCH_MSM8226) += htc_acoustic_alsa.o
 obj-$(CONFIG_MACH_M8) += board-m8-gpiomux.o board-m8-audio.o
+
 
 obj-$(CONFIG_HTC_HEADSET_PMIC) += htc_headset_pmic.o
 obj-$(CONFIG_HTC_HEADSET_GPIO) += htc_headset_gpio.o

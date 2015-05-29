@@ -16,14 +16,6 @@
 #include <linux/log2.h>
 #include <mach/ocmem.h>
 
-/* Set up look-up tables to convert HAL_* to HFI_*.
- *
- * The tables below mostly take advantage of the fact that most
- * HAL_* types are defined bitwise. So if we index them normally
- * when declaring the tables, we end up with huge arrays with wasted
- * space.  So before indexing them, we apply log2 to use a more
- * sensible index.
- */
 static int profile_table[] = {
 	[ilog2(HAL_H264_PROFILE_BASELINE)] = HFI_H264_PROFILE_BASELINE,
 	[ilog2(HAL_H264_PROFILE_MAIN)] = HFI_H264_PROFILE_MAIN,
@@ -77,8 +69,6 @@ static int nal_type[] = {
 static inline int hal_to_hfi_type(int property, int hal_type)
 {
 	if (hal_type && (roundup_pow_of_two(hal_type) != hal_type)) {
-		/* Not a power of 2, it's not going
-		 * to be in any of the tables anyway */
 		return -EINVAL;
 	}
 
@@ -1153,17 +1143,12 @@ int create_pkt_cmd_session_set_property(
 		min_qp = hal_range->min_qp;
 		max_qp = hal_range->max_qp;
 
-		/* We'll be packing in the qp, so make sure we
-		 * won't be losing data when masking */
 		if (min_qp > 0xff || max_qp > 0xff) {
 			dprintk(VIDC_ERR, "qp value out of range\n");
 			rc = -ERANGE;
 			break;
 		}
 
-		/* When creating the packet, pack the qp value as
-		 * 0xiippbb, where ii = qp range for I-frames,
-		 * pp = qp range for P-frames, etc. */
 		hfi->min_qp = min_qp | min_qp << 8 | min_qp << 16;
 		hfi->max_qp = max_qp | max_qp << 8 | max_qp << 16;
 		hfi->layer_id = hal_range->layer_id;
@@ -1447,7 +1432,6 @@ int create_pkt_cmd_session_set_property(
 		hfi->ltrcount = hal->ltrcount;
 		hfi->trustmode = hal->trustmode;
 		pkt->size += sizeof(u32) + sizeof(struct hfi_ltrmode);
-		pr_err("SET LTR\n");
 		break;
 	}
 	case HAL_CONFIG_VENC_USELTRFRAME:
@@ -1461,7 +1445,6 @@ int create_pkt_cmd_session_set_property(
 		hfi->refltr = hal->refltr;
 		hfi->useconstrnt = hal->useconstrnt;
 		pkt->size += sizeof(u32) + sizeof(struct hfi_ltruse);
-		pr_err("USE LTR\n");
 		break;
 	}
 	case HAL_CONFIG_VENC_MARKLTRFRAME:
@@ -1473,7 +1456,6 @@ int create_pkt_cmd_session_set_property(
 		hfi = (struct hfi_ltrmark *) &pkt->rg_property_data[1];
 		hfi->markframe = hal->markframe;
 		pkt->size += sizeof(u32) + sizeof(struct hfi_ltrmark);
-		pr_err("MARK LTR\n");
 		break;
 	}
 	case HAL_PARAM_VENC_HIER_P_MAX_ENH_LAYERS:
@@ -1492,7 +1474,21 @@ int create_pkt_cmd_session_set_property(
 		pkt->size += sizeof(u32) * 2;
 		break;
 	}
-	/* FOLLOWING PROPERTIES ARE NOT IMPLEMENTED IN CORE YET */
+	case HAL_PARAM_VENC_ENABLE_INITIAL_QP:
+	{
+		struct hfi_initial_quantization *hfi;
+		struct hal_initial_quantization *quant = pdata;
+		pkt->rg_property_data[0] =
+			HFI_PROPERTY_PARAM_VENC_INITIAL_QP;
+		hfi = (struct hfi_initial_quantization *) &pkt->rg_property_data[1];
+		hfi->init_qp_enable = quant->initqp_enable;
+		hfi->qp_i = quant->qpi;
+		hfi->qp_p = quant->qpp;
+		hfi->qp_b = quant->qpb;
+		pkt->size += sizeof(u32) + sizeof(struct hfi_initial_quantization);
+		break;
+	}
+	
 	case HAL_CONFIG_BUFFER_REQUIREMENTS:
 	case HAL_CONFIG_PRIORITY:
 	case HAL_CONFIG_BATCH_INFO:

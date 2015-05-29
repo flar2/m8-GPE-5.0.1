@@ -1312,8 +1312,8 @@ void __cfg80211_send_event_skb(struct sk_buff *skb, gfp_t gfp);
 static inline struct sk_buff *
 cfg80211_vendor_cmd_alloc_reply_skb(struct wiphy *wiphy, int approxlen)
 {
-	return __cfg80211_alloc_reply_skb(wiphy, NL80211_CMD_TESTMODE,
-					  NL80211_ATTR_TESTDATA, approxlen);
+	return __cfg80211_alloc_reply_skb(wiphy, NL80211_CMD_VENDOR,
+					  NL80211_ATTR_VENDOR_DATA, approxlen);
 }
 
 int cfg80211_vendor_cmd_reply(struct sk_buff *skb);
@@ -1458,6 +1458,7 @@ void cfg80211_ft_event(struct net_device *netdev,
 
 
 void cfg80211_ap_stopped(struct net_device *netdev, gfp_t gfp);
+bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb);
 
 
 

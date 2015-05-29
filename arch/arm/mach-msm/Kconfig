@@ -487,6 +487,49 @@ config ARCH_MSM8610
 	select MSM_IOMMU_SYNC
 	select MSM_RPM_STATS_LOG
 
+config ARCH_MSM8226
+	bool "MSM8226"
+	select ARM_GIC
+	select GIC_SECURE
+	select ARCH_MSM_CORTEXMP
+	select CPU_V7
+	select MSM_SCM
+	select MAY_HAVE_SPARSE_IRQ
+	select SPARSE_IRQ
+	select MULTI_IRQ_HANDLER
+	select ARM_TICKET_LOCKS
+	select GPIO_MSM_V3
+	select MSM_GPIOMUX
+	select MSM_NATIVE_RESTART
+	select MSM_RESTART_V2
+	select MSM_QDSP6_APRV2
+	select MSM_QDSP6V2_CODECS
+	select MSM_AUDIO_QDSP6V2 if SND_SOC
+	select QMI_ENCDEC
+	select MSM_RPM_SMD
+	select MSM_SPM_V2
+	select MSM_L2_SPM
+	select MSM_PM if PM
+	select MEMORY_HOLE_CARVEOUT
+	select MSM_BUS_SCALING
+	select MSM_CORTEX_A7
+	select CPU_FREQ_MSM
+	select CPU_FREQ
+	select PM_DEVFREQ
+	select MSM_DEVFREQ_CPUBW
+	select MSM_PIL
+	select MSM_RUN_QUEUE_STATS
+	select ARM_HAS_SG_CHAIN
+	select REGULATOR
+	select MSM_RPM_REGULATOR_SMD
+	select MSM_SPM_REGULATOR
+	select MSM_JTAG_MM if CORESIGHT_ETM
+	select MSM_CPR_REGULATOR
+	select MSM_RPM_LOG
+	select MSM_RPM_STATS_LOG
+	select ARCH_WANT_KMAP_ATOMIC_FLUSH
+	select ENABLE_VMALLOC_SAVINGS
+
 config ARCH_MSMSAMARIUM
 	bool "MSMSAMARIUM"
 	select ARCH_MSM_KRAITMP
@@ -1508,6 +1551,13 @@ config HTC_INSERT_NOTIFY_DELAY
 	help
 	  delay headset insert notify
 
+config HTC_HEADSET_DET_DEBOUNCE
+	tristate "HTC headset detect-pin debounce"
+	depends on HTC_HEADSET_INT_REDETECT
+	default n
+	help
+	  Support headset detect-pin debounce
+
 config TROUT_BATTCHG
 	depends on MACH_TROUT && POWER_SUPPLY
 	default y
@@ -1522,6 +1572,11 @@ config HTC_BATT_8960
         depends on HTC_BATT_CORE
         default n
         bool "HTC battery driver for 8960"
+
+config HTC_BATT_SWOLLEN_WA
+        depends on HTC_BATT_8960
+        default n
+        bool "HTC battery swollen workaround"
 
 config DUTY_CYCLE_LIMIT
 	bool "Duty cycle limit charging support"
@@ -3028,6 +3083,13 @@ config MSM_UARTDM_Core_v14
 	depends on SERIAL_MSM_HS
 	help
 		Select if BLSP based UART Core v.14 or higher is present.
+
+config MSM_COMMON_LOG
+	bool "Use to export symbols for parsing memory dump"
+	help
+	 Use this to export symbols to a memory dump table. This table
+	 can be used by post analysis tools to extract information from
+	 memory when device crashes.
 
 config MSM_BOOT_STATS
 	bool "Use MSM boot stats reporting"

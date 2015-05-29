@@ -38,7 +38,7 @@ static atomic_t mnemosync_is_init = ATOMIC_INIT(0);
 struct mnemosyne_meta {
 	char *name;
 	int num;
-	int index;	
+	int index;	/* start index in raw data */
 };
 
 #undef DECLARE_MNEMOSYNE_START
@@ -82,7 +82,7 @@ static int mnemosyne_setup(unsigned int phys, unsigned base)
 	pr_info("%s: base: 0x%p\n", MNEMOSYNE_MODULE_NAME, mnemosyne_base);
 	pr_info("%s: init success.\n", MNEMOSYNE_MODULE_NAME);
 
-	
+	/* fill start index of each footprint to save query time */
 	for (i=0, index=0; i<sizeof(mnemosyne_meta_data)/sizeof(struct mnemosyne_meta); i++) {
 		mnemosyne_meta_data[i].index = index;
 		index += mnemosyne_meta_data[i].num;
@@ -162,7 +162,7 @@ static const struct file_operations is_init_fops = {
 
 static void* rawdata_seq_start(struct seq_file *sfile, loff_t *pos)
 {
-	
+	/* early return for non-init driver. */
 	if (atomic_read(&mnemosync_is_init) == 0) {
 		pr_warn("%s: not init!\n", MNEMOSYNE_MODULE_NAME);
 		return NULL;
@@ -293,12 +293,14 @@ static int __init mnemosyne_init(void)
 	return platform_driver_register(&mnemosyne_driver);
 }
 
+/* For board_early_init use, if called, no need to do device register. */
 int mnemosyne_early_init(unsigned int phys, unsigned base)
 {
 	pr_info("%s: init from early init.\n", MNEMOSYNE_MODULE_NAME);
 	return mnemosyne_setup(phys, base);
 }
 
+/* do not move it before or equal to core_init, because we need /sys/kernel for SYSFS node. */
 arch_initcall(mnemosyne_init);
 
 MODULE_LICENSE("GPL v2");

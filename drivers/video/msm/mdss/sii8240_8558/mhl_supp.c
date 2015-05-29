@@ -45,7 +45,15 @@ bool si_mhl_tx_ucpk_send(struct mhl_dev_context *dev_context, uint8_t ucp_key_co
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
 void si_mhl_tx_request_devcap_category(struct mhl_dev_context *dev_context);
 #endif
+/*
+   @file si_mhl_tx.c
+*/
+//#include "si_mhl_defs.h"
+//#include "si_mhl_tx_api.h"
+//#include "si_mhl_tx.h"
 
+//#include "si_drv_mhl_tx.h"  // exported stuff from the driver
+//#include "si_hdmi_tx_lite_api.h"
 
 struct mhl_dev_context *get_mhl_device_context(void *context)
 {
@@ -68,7 +76,7 @@ void init_cbus_queue(struct mhl_dev_context *dev_context)
 
 	dev_context->current_cbus_req = NULL;
 
-	
+	/* Place pre-allocated CBUS queue entries on the free list */
 	for (idx = 0; idx < NUM_CBUS_EVENT_QUEUE_EVENTS; idx++) {
 
 		entry = &dev_context->cbus_req_entries[idx];
@@ -91,7 +99,7 @@ static struct cbus_req* get_free_cbus_queue_entry(struct mhl_dev_context *dev_co
 	list_del(entry);
 	req = list_entry(entry, struct cbus_req, link);
 
-	
+	/* Start clean */
 	req->status.flags.cancel = 0;
 	return req;
 }
@@ -165,7 +173,7 @@ uint8_t calculate_generic_checksum(uint8_t *info_frame_data, uint8_t checksum,
 
 	return checksum;
 }
-#ifdef	EXAMPLE_ONLY	
+#ifdef	EXAMPLE_ONLY	// This function is not called from anywhere.
 int8_t avi_info_frame_cmp(avi_info_frame_t *p0, avi_info_frame_t *p1)
 {
 	uint8_t i;
@@ -190,7 +198,15 @@ int8_t avi_info_frame_cmp(avi_info_frame_t *p0, avi_info_frame_t *p1)
 	}
 	return ret_val;
 }
-#endif	
+#endif	//	EXAMPLE_ONLY	// This function is not called from anywhere.
+/*
+ * si_mhl_tx_set_status
+ *
+ * Set MHL defined STATUS bits in peer's register set.
+ *
+ * register	    MHL register to write
+ * value        data to write to the register
+ */
 bool si_mhl_tx_set_status(struct mhl_dev_context *dev_context,
 								 uint8_t reg_to_write, uint8_t value)
 {
@@ -208,12 +224,25 @@ bool si_mhl_tx_set_status(struct mhl_dev_context *dev_context,
 	req->command				= MHL_WRITE_STAT;
 	req->reg					= reg_to_write;
 	req->reg_data				= value;
+//	req->offset_data			= regToWrite;
+//	req->payload_u.msg_data[0]	= value;
 
     queue_cbus_transaction(dev_context, req);
 
     return true;
 }
 
+/*
+ * si_mhl_tx_set_int
+ * Set MHL defined INTERRUPT bits in peer's register set.
+ * This function returns true if operation was successfully performed.
+ *
+ *  regToWrite      Remote interrupt register to write
+ *  mask            the bits to write to that register
+ *
+ *  priority        0:  add to head of CBusQueue
+ *                  1:  add to tail of CBusQueue
+ */
 bool si_mhl_tx_set_int(struct mhl_dev_context *dev_context,
 					   uint8_t reg_to_write, uint8_t  mask,
 					   uint8_t priority_level)
@@ -230,6 +259,8 @@ bool si_mhl_tx_set_int(struct mhl_dev_context *dev_context,
 	req->command				= MHL_SET_INT;
 	req->reg					= reg_to_write;
 	req->reg_data				= mask;
+//	req->offset_data			= reg_to_write;
+//	req->payload_u.msg_data[0]	= mask;
 
 	if(priority_level)
 	    queue_cbus_transaction(dev_context, req);
@@ -249,8 +280,8 @@ static void	si_mhl_tx_reset_states(struct mhl_dev_context *dev_context)
 	dev_context->msc_msg_arrived		= false;
 	dev_context->status_0            	= 0;
 	dev_context->status_1            	= 0;
-	dev_context->link_mode            	= MHL_STATUS_CLK_MODE_NORMAL; 
-	dev_context->preferred_clk_mode		= MHL_STATUS_CLK_MODE_NORMAL;  
+	dev_context->link_mode            	= MHL_STATUS_CLK_MODE_NORMAL; // indicate normal (24-bit) mode
+	dev_context->preferred_clk_mode		= MHL_STATUS_CLK_MODE_NORMAL;  // this can be overridden by the application calling si_mhl_tx_set_preferred_pixel_format()
 	dev_context->misc_flags.as_uint32	= 0;
 
 	#ifdef MEDIA_DATA_TUNNEL_SUPPORT
@@ -306,13 +337,13 @@ static void cbus_abort_timer_callback(void *callback_param)
 
 void process_cbus_abort(struct mhl_dev_context *dev_context)
 {
-	
+	/* Delay the sending of any new CBUS messages for 2 seconds */
 	dev_context->misc_flags.flags.cbus_abort_delay_active = true;
 
 	mhl_tx_start_timer(dev_context, dev_context->cbus_abort_timer, 2000);
 }
 
-#ifdef DEBUG 
+#ifdef DEBUG //(
 static char *get_cbus_command_string(int command)
 {
 #define CBUS_COMMAND_CASE(command) case command: return #command;
@@ -339,7 +370,14 @@ static char *get_cbus_command_string(int command)
 	}
 	return "unknown";
 }
-#endif 
+#endif //)
+/*
+ * si_mhl_tx_drive_states
+ *
+ * This function is called by the interrupt handler in the driver layer.
+ * to move the MSC engine to do the next thing before allowing the application
+ * to run RCP APIs.
+ */
 void si_mhl_tx_drive_states(struct mhl_dev_context *dev_context)
 {
 	struct cbus_req		*req;
@@ -358,18 +396,22 @@ void si_mhl_tx_drive_states(struct mhl_dev_context *dev_context)
 		return;
 	}
 
-	
+	/* process queued CBus transactions */
 	req = get_next_cbus_transaction(dev_context);
 	if (req == NULL) {
 		return;
 	}
 
 	MHL_TX_DBG_INFO(dev_context, "req: %p\n",req);
-	
+	/* coordinate write burst requests and grants. */
 	if (MHL_SET_INT == req->command) {
 		if (MHL_RCHANGE_INT == req->reg) {
 			if (dev_context->misc_flags.flags.scratchpad_busy) {
 				if (MHL_INT_REQ_WRT == req->reg_data) {
+					/*
+					 * Can't handle this request right now so just push it
+					 * back onto the front of the queue.
+					 */
 					queue_priority_cbus_transaction(dev_context, req);
 					req = NULL;
 					MHL_TX_DBG_INFO(dev_context, "req: %p\n",req);
@@ -389,7 +431,7 @@ void si_mhl_tx_drive_states(struct mhl_dev_context *dev_context)
 
 	} else if (MHL_WRITE_BURST == req->command) {
 		if (dev_context->misc_flags.flags.write_burst_pending) {
-			
+			/* Still waiting for write burst grant */
 			req = NULL;
 			MHL_TX_DBG_INFO(dev_context, "req: %p\n",req);
 		}
@@ -460,6 +502,12 @@ err_exit:
 	return status;
 }
 
+/*
+ * si_mhl_tx_send_msc_msg
+ *
+ * This function sends a MSC_MSG command to the peer.
+ * It returns true if successful in doing so.
+ */
 static bool si_mhl_tx_send_msc_msg(struct mhl_dev_context *dev_context,
 								   uint8_t command, uint8_t cmdData)
 {
@@ -475,6 +523,8 @@ static bool si_mhl_tx_send_msc_msg(struct mhl_dev_context *dev_context,
 
 	req->retry_count	= 2;
 	req->command		= MHL_MSC_MSG;
+//	req->payload_u.msg_data[0]  = command;
+//	req->payload_u.msg_data[1]  = cmdData;
 	req->msg_data[0]	= command;
 	req->msg_data[1]	= cmdData;
 
@@ -483,12 +533,25 @@ static bool si_mhl_tx_send_msc_msg(struct mhl_dev_context *dev_context,
     return true;
 }
 
+/*
+ * si_mhl_rapk_send
+ * This function sends RAPK to the peer device.
+ */
 static bool si_mhl_rapk_send(struct mhl_dev_context *dev_context,
 							 uint8_t status)
 {
 	return (si_mhl_tx_send_msc_msg(dev_context, MHL_MSC_MSG_RAPK, status));
 }
 
+/*
+ * si_mhl_tx_rcpe_send
+ *
+ * The function will return a value of true if it could successfully send the RCPE
+ * subcommand. Otherwise false.
+ *
+ * When successful, mhl_tx internally sends RCPK with original (last known)
+ * keycode.
+ */
 bool si_mhl_tx_rcpe_send(struct mhl_dev_context *dev_context,
 						 uint8_t rcpe_error_code)
 {
@@ -502,24 +565,34 @@ bool si_mhl_tx_rcpe_send(struct mhl_dev_context *dev_context,
 	return status;
 }
 
+/*
+ * si_mhl_tx_process_events
+ * This internal function is called at the end of interrupt processing.  It's
+ * purpose is to process events detected during the interrupt.  Some events
+ * are internally handled here but most are handled by a notification to
+ * interested applications.
+ */
 void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 {
 	uint8_t	rapk_status;
 
-	
+	/* Make sure any events detected during the interrupt are processed. */
     si_mhl_tx_drive_states(dev_context);
 
 	if(dev_context->mhl_connection_event) {
 		MHL_TX_DBG_INFO(dev_context, "mhl_connection_event\n");
 
-		
+		/* Consume the message */
 		dev_context->mhl_connection_event = false;
 
+		/*
+		 * Let interested apps know about the connection state change
+		 */
 		mhl_event_notify(dev_context, dev_context->mhl_connected,
 						 dev_context->dev_cap_cache.mdc.featureFlag,
 						 NULL);
 
-		
+		/* If connection has been lost, reset all state flags. */
 		if(MHL_TX_EVENT_DISCONNECTION == dev_context->mhl_connected)
 			si_mhl_tx_reset_states(dev_context);
 
@@ -533,11 +606,17 @@ void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 				 dev_context->msc_msg_sub_command,
 				 dev_context->msc_msg_data);
 
-		
+		/* Consume the message */
 		dev_context->msc_msg_arrived = false;
 
+		/*
+		 * Map MSG sub-command to an event ID
+		 */
 		switch(dev_context->msc_msg_sub_command) {
 		case MHL_MSC_MSG_RAP:
+			/*
+			 * RAP messages are fully handled here.
+			 */
 			if (dev_context->mhl_flags & MHL_STATE_APPLICATION_RAP_BUSY){
 				rapk_status = MHL_RAPK_BUSY;
 			}else{
@@ -545,7 +624,7 @@ void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 			}
 			dev_context->rap_in_sub_command = dev_context->msc_msg_data;
 			if (MHL_RAP_POLL== dev_context->msc_msg_data) {
-				
+				// just do the ack
 			} else if (MHL_RAP_CONTENT_ON == dev_context->msc_msg_data) {
 				dev_context->misc_flags.flags.rap_content_on = true;
 				si_mhl_tx_drv_content_on(
@@ -563,7 +642,7 @@ void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 				rapk_status = MHL_RAPK_UNRECOGNIZED;
 			}
 
-			
+			/* Always RAPK to the peer */
 			si_mhl_rapk_send(dev_context, rapk_status);
 
 			if (rapk_status == MHL_RAPK_NO_ERR)
@@ -572,12 +651,16 @@ void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 			break;
 
 		case MHL_MSC_MSG_RCP:
+			/*
+			 * If we get a RCP key that we do NOT support, send back RCPE
+			 * Do not notify app layer.
+			 */
 			if (rcpSupportTable[dev_context->msc_msg_data & MHL_RCP_KEY_ID_MASK].rcp_support
 			    & MHL_LOGICAL_DEVICE_MAP) {
 				mhl_event_notify(dev_context, MHL_TX_EVENT_RCP_RECEIVED,
 						dev_context->msc_msg_data, NULL);
 			} else {
-				
+				/* Save keycode to send a RCPK after RCPE. */
 				dev_context->msc_save_rcp_key_code = dev_context->msc_msg_data;
 				si_mhl_tx_rcpe_send(dev_context, RCPE_INEEFECTIVE_KEY_CODE);
 			}
@@ -594,6 +677,11 @@ void si_mhl_tx_process_events(struct mhl_dev_context *dev_context)
 			break;
 
 		case MHL_MSC_MSG_UCP:
+			/*
+			 * Save keycode  so that we can send an UCPE message in
+			 * case the UCP key code is rejected by the host application.
+			 *
+			 */
 			dev_context->msc_save_ucp_key_code = dev_context->msc_msg_data;
 			mhl_event_notify(dev_context, MHL_TX_EVENT_UCP_RECEIVED,
 					dev_context->msc_save_ucp_key_code, NULL);
@@ -638,7 +726,9 @@ bool si_mhl_tx_read_devcap(struct mhl_dev_context *dev_context,
 	req->retry_count	= 2;
 	req->command		= MHL_READ_DEVCAP;
 	req->reg			= offset;
-	req->reg_data		= 0;  
+	req->reg_data		= 0;  /* do this to avoid confusion */
+//	req->offset_data  = offset;
+//	req->payload_u.msg_data[0]  = 0;  /* do this to avoid confusion */
 
 	queue_cbus_transaction(dev_context, req);
 
@@ -658,6 +748,12 @@ bool si_mhl_tx_rcpk_send(struct mhl_dev_context *dev_context,
 	return status;
 }
 
+/*
+ * si_mhl_tx_request_first_edid_block
+ *
+ * This function initiates a CBUS command to read the specified EDID block.
+ * Returns true if the command was queued successfully.
+ */
 void si_mhl_tx_request_first_edid_block(struct mhl_dev_context *dev_context)
 {
 	MHL_TX_DBG_INFO(dev_context, "tag: EDID active: %d\n"
@@ -673,11 +769,11 @@ void si_mhl_tx_request_first_edid_block(struct mhl_dev_context *dev_context)
 			MHL_TX_DBG_INFO(dev_context, "tag: EDID active: %d\n"
 						,dev_context->misc_flags.flags.edid_loop_active);
 
-			
+			/* Send MHL_READ_EDID_BLOCK command */
 			req->retry_count	= 2;
 			req->command		= MHL_READ_EDID_BLOCK;
-			req->offset			= 0; 
-			req->msg_data[0]	= 0;  
+			req->offset			= 0; /* block number */
+			req->msg_data[0]	= 0;  /* do this to avoid confusion */
 
 			queue_cbus_transaction(dev_context, req);
 
@@ -686,6 +782,17 @@ void si_mhl_tx_request_first_edid_block(struct mhl_dev_context *dev_context)
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////
+//
+// si_mhl_tx_msc_command_done
+//
+// This function is called by the driver to inform of completion of last command.
+//
+// It is called in interrupt context to meet some MHL specified timings, therefore,
+// it should not have to call app layer and do negligible processing, no printfs.
+//
+//#define FLAG_OR_NOT(x) TestMiscFlag(FLAGS_HAVE_##x)?#x:""
+//#define SENT_OR_NOT(x) TestMiscFlag(FLAGS_SENT_##x)?#x:""
 
 #ifdef CONFIG_MHL_MONITOR_WORKAROUND
 void si_mhl_tx_msc_command_done(struct drv_hw_context *hw_context,
@@ -715,9 +822,17 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 		bool temp;
 		int i;
 		MHLDevCap_u	old_devcap,devcap_changes;
+/*
+#if defined(DEBUG)
+		uint8_t *dcap = dev_context->dev_cap_cache.devcap_cache;
+#endif
+*/
 		old_devcap=dev_context->dev_cap_cache;
 		si_mhl_tx_read_devcap_fifo((struct drv_hw_context *)&dev_context->drv_context,
 						&dev_context->dev_cap_cache);
+		/*
+		 *  Generate a change mask between the old and new devcaps
+		 */
 		for (i=0; i< sizeof(old_devcap);++i) {
 			devcap_changes.devcap_cache[i]
 				= dev_context->dev_cap_cache.devcap_cache[i]
@@ -730,9 +845,12 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 		MHL_TX_DBG_ERR(NULL, "Non Backdoor Charging");
 		htc_charging_enable(dev_context->dev_cap_cache.mdc.deviceCategory);
 #endif
-		
+		/* indicate that the DEVCAP cache is up to date. */
 		dev_context->misc_flags.flags.have_complete_devcap = true;
 
+		/*
+		 * Check to see if any other bits besides POW_BIT have changed
+		 */
 		devcap_changes.mdc.deviceCategory &= ~MHL_DEV_CATEGORY_POW_BIT;
 		temp = 0;
 		for (i = 0; i < sizeof(devcap_changes);++i) {
@@ -789,14 +907,26 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 
 			msleep(1000);
 			MHL_TX_DBG_INFO(dev_context, "MSC_NAK, re-trying... \n");
+			/*
+			 * Request must be retried, so place it back
+			 * on the front of the queue.
+			 */
 			req->status.as_uint8 = 0;
 			queue_priority_cbus_transaction(dev_context, req);
 			req = NULL;
 		} else {
 			if (MHL_MSC_MSG_RCPE == req->msg_data[0]) {
+				/*
+				 * RCPE is always followed by an RCPK with original
+				 * key code received.
+				 */
 				si_mhl_tx_rcpk_send(dev_context,
 						dev_context->msc_save_rcp_key_code);
 			} else if (MHL_MSC_MSG_UCPE == req->msg_data[0]) {
+				/*
+				 * UCPE is always followed by an UCPK with original
+				 * key code received.
+				 */
 				si_mhl_tx_ucpk_send(dev_context,
 						dev_context->msc_save_ucp_key_code);
 			} else {
@@ -813,6 +943,12 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 	} else if (MHL_WRITE_BURST == req->command) {
 		MHL_TX_DBG_INFO(dev_context, "MHL_WRITE_BURST\n");
 
+		/*
+		 * Write to scratch pad of downstream device is complete.
+		 * Send a SET_INT message to the device to inform it of the
+		 * completion.  Use priority 0 to place this message at the
+		 * head of the queue.
+		 */
 		si_mhl_tx_set_int(dev_context, MHL_RCHANGE_INT,
 						  MHL_INT_DSCR_CHG, 0);
 
@@ -826,6 +962,12 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 				dev_context->misc_flags.flags.scratchpad_busy = false;
 
 			} else if (MHL_INT_REQ_WRT == req->reg_data) {
+				/*
+				 * Successfully sent scratch pad write request.
+				 * Now reformat the command queue entry used to send the
+				 * write request to send the write burst data once a
+				 * write grant interrupt is received.
+				 */
 				req->retry_count = 1;
 				req->command 	 = MHL_WRITE_BURST;
 				queue_priority_cbus_transaction(dev_context, req);
@@ -858,6 +1000,9 @@ void si_mhl_tx_msc_command_done(struct mhl_dev_context *dev_context, uint8_t dat
 		if (dev_context->misc_flags.flags.have_complete_devcap) {
 			if (dev_context->misc_flags.flags.sent_path_en) {
 				if (dev_context->misc_flags.flags.sent_dcap_rdy) {
+					/*
+					 * Now we can entertain App commands for RCP, UCP, RAP
+					 */
 					dev_context->misc_flags.flags.rcp_ready = true;
 				}
 			}
@@ -871,7 +1016,7 @@ void si_mhl_tx_process_write_burst_data(struct mhl_dev_context *dev_context)
 	BurstId_e burst_id;
 
 	MHL_TX_DBG_INFO(NULL,"\n");
-	
+	// continue else statement to support 3D along with MDT
 	ret_val = si_mhl_tx_drv_get_scratch_pad((struct drv_hw_context *)
 						(&dev_context->drv_context), 0,
 						dev_context->incoming_scratch_pad.asBytes,
@@ -897,14 +1042,19 @@ void si_mhl_tx_process_write_burst_data(struct mhl_dev_context *dev_context)
 			break;
 
 		case LOCAL_ADOPTER_ID:
-#ifdef MEDIA_DATA_TUNNEL_SUPPORT 
+#ifdef MEDIA_DATA_TUNNEL_SUPPORT //(
 		case MHL_TEST_ADOPTER_ID:
 			si_mhl_tx_mdt_process_packet(dev_context,(void *)&dev_context->incoming_scratch_pad.asBytes);
-#else 
+#else //)(
+			/*
+			 * Cause a notification event to be raised to allow
+			 * interested applications a chance to process the
+			 * received write burst data.
+			 */
 			mhl_event_notify(dev_context, MHL_TX_EVENT_SPAD_RECEIVED,
 							 sizeof(dev_context->incoming_scratch_pad),
 							 dev_context->incoming_scratch_pad.asBytes);
-#endif 
+#endif //)
 			break;
 
 		default:
@@ -940,10 +1090,15 @@ static void si_mhl_tx_refresh_peer_devcap_entries( struct mhl_dev_context *dev_c
 				,dev_context->misc_flags.flags.have_complete_devcap
 					?"current":"stale");
 
-		
+		// bugzilla 27431 - dongle power cord attachment fix. if (!dev_context->misc_flags.flags.have_complete_devcap)
 		{
 			MHL_TX_DBG_INFO(dev_context, "devcap is stale\n");
 
+			/*
+			 * If there is a DEV CAP read operation in progress
+			 * cancel it and issue a new DEV CAP read to make sure
+			 * we pick up all the DEV CAP register changes.
+			 */
 			if (dev_context->current_cbus_req != NULL) {
 				if (dev_context->current_cbus_req->command ==
 					MHL_READ_DEVCAP) {
@@ -958,7 +1113,28 @@ static void si_mhl_tx_refresh_peer_devcap_entries( struct mhl_dev_context *dev_c
 	}
 }
 
+/*
+ * si_mhl_tx_got_mhl_msc_message
+ *
+ * This function is called by the driver to inform of arrival of a MHL MSC_MSG
+ * such as RCP, RCPK, RCPE.
+ */
+//void si_mhl_tx_got_mhl_msc_message(struct mhl_dev_context *dev_context,
+//								   uint8_t sub_command, uint8_t cmd_data)
+//{
+//
+//	/* Remember the event for processing at the completion of the interrupt. */
+//	dev_context->msc_msg_arrived		= true;
+//	dev_context->msc_msg_sub_command	= sub_command;
+//	dev_context->msc_msg_data			= cmd_data;
+//}
 
+/*
+ * si_mhl_tx_got_mhl_intr
+ *
+ * This function is called to inform of the arrival
+ * of an MHL INTERRUPT message.
+ */
 void si_mhl_tx_got_mhl_intr(struct mhl_dev_context *dev_context,
 							uint8_t intr_0, uint8_t intr_1)
 {
@@ -966,7 +1142,7 @@ void si_mhl_tx_got_mhl_intr(struct mhl_dev_context *dev_context,
 	MHL_TX_DBG_INFO(dev_context, "INTERRUPT Arrived. %02X, %02X\n",
 					intr_0, intr_1);
 
-	
+	/* Handle DCAP_CHG INTR here */
 	if (MHL_INT_DCAP_CHG & intr_0) {
 		MHL_TX_DBG_INFO(dev_context, "got DCAP_CHG\n");
         if (MHL_STATUS_DCAP_RDY & dev_context->status_0) {
@@ -978,27 +1154,42 @@ void si_mhl_tx_got_mhl_intr(struct mhl_dev_context *dev_context,
 
 	if (MHL_INT_DSCR_CHG & intr_0) {
 
-		
+		/* remote WRITE_BURST is complete */
 		dev_context->misc_flags.flags.scratchpad_busy = false;
 		si_mhl_tx_process_write_burst_data(dev_context);
 	}
 
 	if( MHL_INT_REQ_WRT  & intr_0) {
-		
+		/* Scratch pad write request from the sink device. */
 		if (dev_context->misc_flags.flags.scratchpad_busy) {
+			/*
+			 * Use priority 1 to defer sending grant until
+			 * local traffic is done
+			 */
 			si_mhl_tx_set_int(dev_context, MHL_RCHANGE_INT,
 					MHL_INT_GRT_WRT, 1);
 		} else {
 			dev_context->misc_flags.flags.scratchpad_busy = true;
-			
+			/* use priority 0 to respond immediately */
 			si_mhl_tx_set_int(dev_context, MHL_RCHANGE_INT,
 					MHL_INT_GRT_WRT, 0);
 		}
 	}
 
 	if (MHL_INT_GRT_WRT  & intr_0) {
+		/*
+		 * Write burst grant received so enable
+		 * write burst message to be sent.
+		 */
 		dev_context->misc_flags.flags.write_burst_pending = false;
 	}
+//    	uint8_t length = sizeof(dev_context->outgoing_scratch_pad);
+//    	MHL_TX_DBG_INFO(dev_context, "MHL_INT_GRT_WRT length:%d\n",
+//    					length);
+//        si_mhl_tx_do_write_burst(dev_context, 0x40,
+//        						 dev_context->outgoing_scratch_pad.asBytes,
+//        						 length);
+//    }
 
 	if(MHL_INT_EDID_CHG & intr_1) {
 
@@ -1017,6 +1208,11 @@ void si_mhl_tx_got_mhl_intr(struct mhl_dev_context *dev_context,
 	}
 }
 
+/*
+ * si_mhl_tx_got_mhl_status
+ *
+ * This function is called by the driver to inform of arrival of a MHL STATUS.
+ */
 void si_mhl_tx_got_mhl_status(struct mhl_dev_context *dev_context,
 					uint8_t status_0, uint8_t status_1)
 {
@@ -1025,9 +1221,16 @@ void si_mhl_tx_got_mhl_status(struct mhl_dev_context *dev_context,
 
 	MHL_TX_DBG_INFO(dev_context, "STATUS Arrived. %02X, %02X\n",
 					status_0, status_1);
+	/*
+	 * Handle DCAP_RDY STATUS here itself
+	 */
 	status_change_bit_mask_0 = status_0 ^ dev_context->status_0;
 	status_change_bit_mask_1 = status_1 ^ dev_context->status_1;
 
+	/*
+	 * Remember the event.   (other code checks the saved values,
+	 * so save the values early, but not before the XOR operations above)
+	 */
 	dev_context->status_0 = status_0;
 	dev_context->status_1 = status_1;
 
@@ -1037,7 +1240,7 @@ void si_mhl_tx_got_mhl_status(struct mhl_dev_context *dev_context,
 			si_mhl_tx_refresh_peer_devcap_entries(dev_context);
 	}
 
-	
+	/* did PATH_EN change? */
 	if(MHL_STATUS_PATH_ENABLED & status_change_bit_mask_1) {
 		MHL_TX_DBG_INFO(dev_context, "PATH_EN changed\n");
 #ifdef CONFIG_MHL_MONITOR_WORKAROUND
@@ -1056,6 +1259,14 @@ void si_mhl_tx_got_mhl_status(struct mhl_dev_context *dev_context,
 	}
 }
 
+/*
+ * si_mhl_tx_rcp_send
+ *
+ * This function checks if the peer device supports RCP and sends rcpKeyCode. The
+ * function will return a value of true if it could successfully send the RCP
+ * subcommand and the key code. Otherwise false.
+ *
+ */
 bool si_mhl_tx_rcp_send(struct mhl_dev_context *dev_context,
 						uint8_t rcpKeyCode)
 {
@@ -1063,6 +1274,9 @@ bool si_mhl_tx_rcp_send(struct mhl_dev_context *dev_context,
 
 	MHL_TX_DBG_INFO(dev_context, "called\n");
 
+	/*
+	 * Make sure peer supports RCP
+	 */
 	if ((dev_context->dev_cap_cache.mdc.featureFlag &
 		MHL_FEATURE_RCP_SUPPORT) &&
 		(dev_context->misc_flags.flags.rcp_ready)) {
@@ -1078,6 +1292,14 @@ bool si_mhl_tx_rcp_send(struct mhl_dev_context *dev_context,
     return status;
 }
 
+/*
+ * si_ucp_msg_send
+ *
+ * This function sends the requested UCP message if UCP reception is
+ * supported by the downstream device.
+ *
+ * The function returns true if the message can be sent, false otherise.
+ */
 bool si_ucp_msg_send(struct mhl_dev_context *dev_context,
 					 uint8_t ucp_msg_sub_cmd, uint8_t ucp_msg_data)
 {
@@ -1085,6 +1307,10 @@ bool si_ucp_msg_send(struct mhl_dev_context *dev_context,
 
 	MHL_TX_DBG_INFO(dev_context, "called\n");
 
+	/*
+	 * Make sure peer supports UCP and that the connection is
+	 * in a state where a UCP message can be sent.
+	 */
 	if ((dev_context->dev_cap_cache.mdc.featureFlag &
 		 MHL_FEATURE_UCP_RECV_SUPPORT) &&
 		(dev_context->misc_flags.flags.rcp_ready)) {
@@ -1101,6 +1327,14 @@ bool si_ucp_msg_send(struct mhl_dev_context *dev_context,
     return status;
 }
 
+/*
+ * si_mhl_tx_ucp_send
+ *
+ * This function is (indirectly) called by a host application to send
+ * a UCP key code to the downstream device.
+ *
+ * Returns true if the key code can be sent, false otherwise.
+ */
 bool si_mhl_tx_ucp_send(struct mhl_dev_context *dev_context,
 						uint8_t ucp_key_code)
 {
@@ -1109,6 +1343,14 @@ bool si_mhl_tx_ucp_send(struct mhl_dev_context *dev_context,
 	return (si_ucp_msg_send(dev_context, MHL_MSC_MSG_UCP, ucp_key_code));
 }
 
+/*
+ * si_mhl_tx_ucp_send
+ *
+ * This function is (indirectly) called by a host application to send
+ * a UCP acknowledge message for a received UCP key code message.
+ *
+ * Returns true if the message can be sent, false otherwise.
+ */
 bool si_mhl_tx_ucpk_send(struct mhl_dev_context *dev_context,
 						 uint8_t ucp_key_code)
 {
@@ -1117,6 +1359,17 @@ bool si_mhl_tx_ucpk_send(struct mhl_dev_context *dev_context,
 	return (si_ucp_msg_send(dev_context, MHL_MSC_MSG_UCPK, ucp_key_code));
 }
 
+/*
+ * si_mhl_tx_ucpe_send
+ *
+ * This function is (indirectly) called by a host application to send a
+ * UCP negative acknowledgment message for a received UCP key code message.
+ *
+ * Returns true if the message can be sent, false otherwise.
+ *
+ * When successful, mhl_tx internally sends UCPK with original (last known)
+ * UCP keycode.
+ */
 bool si_mhl_tx_ucpe_send(struct mhl_dev_context *dev_context,
 						 uint8_t ucpe_error_code)
 {
@@ -1125,6 +1378,14 @@ bool si_mhl_tx_ucpe_send(struct mhl_dev_context *dev_context,
 	return (si_ucp_msg_send(dev_context, MHL_MSC_MSG_UCPE, ucpe_error_code));
 }
 
+/*
+ * si_mhl_tx_rap_send
+ *
+ * This function sends the requested RAP action code message if RAP
+ * is supported by the downstream device.
+ *
+ * The function returns true if the message can be sent, false otherwise.
+ */
 bool si_mhl_tx_rap_send(struct mhl_dev_context *dev_context,
 						uint8_t rap_action_code)
 {
@@ -1132,6 +1393,10 @@ bool si_mhl_tx_rap_send(struct mhl_dev_context *dev_context,
 
 	MHL_TX_DBG_INFO(dev_context, "called\n");
 
+	/*
+	 * Make sure peer supports RAP and that the connection is
+	 * in a state where a RAP message can be sent.
+	 */
 	if ((dev_context->dev_cap_cache.mdc.featureFlag &
 		MHL_FEATURE_RAP_SUPPORT) &&
 		(dev_context->misc_flags.flags.rcp_ready)) {
@@ -1149,6 +1414,13 @@ bool si_mhl_tx_rap_send(struct mhl_dev_context *dev_context,
     return status;
 }
 
+/*
+ * si_mhl_tx_notify_downstream_hpd_change
+ *
+ * Handle the arrival of SET_HPD or CLEAR_HPD messages.
+ *
+ * Turn the content off or on based on what we got.
+ */
 void si_mhl_tx_notify_downstream_hpd_change(
 				struct mhl_dev_context *dev_context,
 				uint8_t downstream_hpd)
@@ -1174,8 +1446,12 @@ void si_mhl_tx_notify_downstream_hpd_change(
 	} else {
 		dev_context->misc_flags.flags.mhl_hpd = true;
 
+		/*
+		 *  possible EDID read is complete here
+		 *  see MHL spec section 5.9.1
+		 */
 		if (dev_context->misc_flags.flags.have_complete_devcap) {
-			
+			/* Devcap refresh is complete */
 			MHL_TX_DBG_INFO(dev_context, "tag:\n");
 			si_mhl_tx_initiate_edid_sequence(dev_context->edid_parser_context);
 		} else {
@@ -1184,11 +1460,21 @@ void si_mhl_tx_notify_downstream_hpd_change(
 	}
 }
 
+/*
+ * 	si_mhl_tx_get_peer_dev_cap_entry
+ *
+ * 	index -- the devcap index to get
+ * 	*data pointer to location to write data
+ *
+ * 	returns
+ * 		0 -- success
+ * 		1 -- busy.
+ */
 uint8_t si_mhl_tx_get_peer_dev_cap_entry(struct mhl_dev_context *dev_context,
 										 uint8_t index, uint8_t *data)
 {
 	if (!dev_context->misc_flags.flags.have_complete_devcap) {
-		
+		/* update is in progress */
 		return 1;
 	} else {
 		*data = dev_context->dev_cap_cache.devcap_cache[index];
@@ -1196,6 +1482,16 @@ uint8_t si_mhl_tx_get_peer_dev_cap_entry(struct mhl_dev_context *dev_context,
 	}
 }
 
+/*
+	si_get_scratch_pad_vector
+	offset -- The beginning offset into the scratch pad from which to fetch entries.
+	length -- The number of entries to fetch
+	*data -- A pointer to an array of bytes where the data should be placed.
+
+	returns:
+		scratch_pad_status see si_mhl_tx_api.h for details
+
+*/
 enum scratch_pad_status si_get_scratch_pad_vector(
 								struct mhl_dev_context *dev_context,
 								uint8_t offset,uint8_t length,
@@ -1222,7 +1518,7 @@ enum scratch_pad_status si_get_scratch_pad_vector(
 	return SCRATCHPAD_SUCCESS;
 }
 
-#ifdef ENABLE_DUMP_INFOFRAME 
+#ifdef ENABLE_DUMP_INFOFRAME //(
 
 #define AT_ROW_END(i,length) (i & (length-1)) == (length-1)
 
@@ -1239,7 +1535,7 @@ void DumpIncomingInfoFrameImpl(char *pszId,char *pszFile,int iLine,info_frame_t 
 	}
 	printk("\n");
 }
-#endif 
+#endif //)
 
 void *si_mhl_tx_get_drv_context(void *context)
 {
@@ -1287,8 +1583,8 @@ void si_mhl_tx_request_devcap_category( struct mhl_dev_context *dev_context)
 		MHL_TX_DBG_INFO(dev_context,"Put MHL_READ_DEVCAT in Queue\n");
 		req->retry_count        = 2;
 		req->command            = MHL_CHECK_HTC_DONGLE_CHARGER;
-		req->offset             = 0; 
-		req->msg_data[0]        = 0;  
+		req->offset             = 0; /* block number */
+		req->msg_data[0]        = 0;  /* do this to avoid confusion */
 
 		queue_cbus_transaction(dev_context, req);
 	}

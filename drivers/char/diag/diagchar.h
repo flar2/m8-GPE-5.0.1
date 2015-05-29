@@ -108,6 +108,8 @@
 #define DIAG_STM_WCNSS	0x04
 #define DIAG_STM_APPS	0x08
 
+#define BAD_PARAM_RESPONSE_MESSAGE 20
+
 #define DIAG_CMD_VERSION	0
 #define DIAG_CMD_DOWNLOAD	0x3A
 #define DIAG_CMD_DIAG_SUBSYS	0x4B
@@ -218,14 +220,6 @@ struct diag_client_map {
 	int timeout;
 };
 
-struct diag_nrt_wake_lock {
-	int enabled;
-	int ref_count;
-	int copy_count;
-	struct wake_lock read_lock;
-	spinlock_t read_spinlock;
-};
-
 struct real_time_vote_t {
 	uint16_t proc;
 	uint8_t real_time_vote;
@@ -273,8 +267,6 @@ struct diag_smd_info {
 
 	struct diag_request *write_ptr_1;
 	struct diag_request *write_ptr_2;
-
-	struct diag_nrt_wake_lock nrt_lock;
 
 	struct workqueue_struct *wq;
 
@@ -482,6 +474,10 @@ struct diagchar_dev {
 	int qxdmusb_drop;
 	struct timeval st0;
 	struct timeval st1;
+	
+	spinlock_t ws_lock;
+	int ws_ref_count;
+	int copy_count;
 };
 
 extern struct diag_bridge_dev *diag_bridge;
@@ -503,7 +499,7 @@ void __diagfwd_dbg_raw_data(void *buf, const char *src, unsigned dbg_flag, unsig
 extern int wrap_enabled;
 extern uint16_t wrap_count;
 #if defined(CONFIG_ARCH_MSM8X60) || defined(CONFIG_ARCH_MSM8960) \
-   || defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_DUMMY)
+   || defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8226)
 #define    SMDDIAG_NAME "DIAG"
 #else
 #define    SMDDIAG_NAME "SMD_DIAG"
@@ -511,6 +507,7 @@ extern uint16_t wrap_count;
 extern struct diagchar_dev *driver;
 void diag_get_timestamp(char *time_str);
 int diag_find_polling_reg(int i);
+void check_drain_timer(void);
 
 void check_drain_timer(void);
 #endif

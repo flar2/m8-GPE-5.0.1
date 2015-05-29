@@ -573,16 +573,19 @@ void extract_dci_pkt_rsp(unsigned char *buf, int len, int data_source,
 	curr_client_pid = req_entry->pid;
 
 	
+	mutex_lock(&driver->dci_mutex);
 	delete_flag = diag_dci_remove_req_entry(temp, rsp_len, req_entry);
-	if ((delete_flag != 0) && (delete_flag != 1))
+	if ((delete_flag != 0) && (delete_flag != 1)) {
+		mutex_unlock(&driver->dci_mutex);
 		return;
+	}
+	mutex_unlock(&driver->dci_mutex);
 
 	entry = __diag_dci_get_client_entry(curr_client_pid);
 	if (!entry) {
 		pr_err("diag: In %s, couldn't find entry\n", __func__);
 		return;
 	}
-
 	rsp_buf = entry->buffers[data_source].buf_cmd;
 
 	mutex_lock(&rsp_buf->data_mutex);

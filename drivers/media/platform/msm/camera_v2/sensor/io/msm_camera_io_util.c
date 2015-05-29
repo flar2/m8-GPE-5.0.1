@@ -480,6 +480,9 @@ int msm_camera_config_single_vreg(struct device *dev,
 		if (IS_ERR(*reg_ptr)) {
 			pr_err("%s: %s get failed\n", __func__,
 				cam_vreg->reg_name);
+			
+			regulator_put(*reg_ptr);
+			
 			*reg_ptr = NULL;
 			goto vreg_get_fail;
 		}

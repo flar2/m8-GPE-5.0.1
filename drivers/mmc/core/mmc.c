@@ -1383,17 +1383,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			mmc_set_erase_size(card);
 		}
 	}
-#if 0
-	
-	if (card->ext_csd.rev >= 6) {
-		
-		if (card->cid.manfid == SAMSUNG_MMC) {
-			if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
-				card->need_sanitize = 1;
-			pr_info("%s: set need_sanitize\n", mmc_hostname(card->host));
-		}
-	}
-#endif
+
 	if (card->ext_csd.part_config & EXT_CSD_PART_CONFIG_ACC_MASK) {
 		card->ext_csd.part_config &= ~EXT_CSD_PART_CONFIG_ACC_MASK;
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG,
@@ -1616,12 +1606,6 @@ static int mmc_suspend(struct mmc_host *host)
 	mmc_disable_clk_scaling(host);
 
 	mmc_claim_host(host);
-
-	if (host->card && mmc_card_need_bkops_in_suspend(host->card)) {
-		pr_info("%s: Force bkops and let card not sleep\n",
-				mmc_hostname(host));
-		goto out;
-	}
 
 	err = mmc_cache_ctrl(host, 0);
 	if (err)

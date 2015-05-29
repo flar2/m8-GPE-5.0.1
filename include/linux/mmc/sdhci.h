@@ -32,6 +32,10 @@ struct sdhci_host {
 	
 	const char *hw_name;	
 
+	int reset_wa_applied;
+	int reset_wa_cnt;
+	int cmd_cnt;
+
 	unsigned int quirks;	
 
 #define SDHCI_QUIRK_CLOCK_BEFORE_RESET			(1<<0)

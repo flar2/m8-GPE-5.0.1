@@ -3484,7 +3484,10 @@ static int fb_notifier_callback(struct notifier_block *self,
         struct fb_event *evdata = data;
         int *blank;
 
+	return 0;
+
         D("%s\n", __func__);
+
         if (evdata && evdata->data && event == FB_EVENT_BLANK && mcu_data &&
                         mcu_data->client) {
                 blank = evdata->data;
@@ -3633,7 +3636,8 @@ static int __devinit CWMCU_i2c_probe(struct i2c_client *client,
 	sensor->mfg_mode = board_mfg_mode();
 	D("%s: Boot mode = %d\n", __func__, sensor->mfg_mode);
 
-	D("castor: CWMCU_i2c_probe success!\n");
+	I("%s: Probe success. [Do not change polling rate when screen off]\n",
+	  __func__);
 #ifdef CONFIG_FB
         sensor->mcu_poll_wq = create_singlethread_workqueue("mcu_poll_reuqest");
         if (!sensor->mcu_poll_wq) {

@@ -346,7 +346,6 @@ static int msm_vidc_initialize_core(struct platform_device *pdev,
 	}
 
 	INIT_LIST_HEAD(&core->instances);
-	mutex_init(&core->sync_lock);
 	mutex_init(&core->lock);
 
 	core->state = VIDC_CORE_UNINIT;
@@ -355,6 +354,7 @@ static int msm_vidc_initialize_core(struct platform_device *pdev,
 		init_completion(&core->completions[i]);
 	}
 
+	INIT_DELAYED_WORK(&core->fw_unload_work, msm_vidc_fw_unload_handler);
 	return rc;
 }
 

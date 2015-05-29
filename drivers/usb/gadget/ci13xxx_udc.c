@@ -1852,6 +1852,7 @@ static int _gadget_stop_activity(struct usb_gadget *gadget, int mute)
 	udc->configured = 0;
 	spin_unlock_irqrestore(udc->lock, flags);
 
+	gadget->xfer_isr_count = 0;
 	gadget->b_hnp_enable = 0;
 	gadget->a_hnp_support = 0;
 	gadget->host_request = 0;
@@ -3092,7 +3093,7 @@ static irqreturn_t udc_irq(void)
 				udc->gadget.ats_reset_irq_count++;
 				if (udc->driver->broadcast_abnormal_usb_reset) {
 							printk(KERN_INFO "[USB] gadget irq :abnormal the amount of reset irq!\n");
-							udc->driver->broadcast_abnormal_usb_reset();
+							
 				}
 			} else if (udc->gadget.ats_reset_irq_count < 50)
 				udc->gadget.ats_reset_irq_count++;
@@ -3118,6 +3119,7 @@ static irqreturn_t udc_irq(void)
 			isr_statistics.uei++;
 		if (USBi_UI  & intr) {
 			isr_statistics.ui++;
+			udc->gadget.xfer_isr_count++;
 			isr_tr_complete_handler(udc);
 		}
 		if (USBi_SLI & intr) {

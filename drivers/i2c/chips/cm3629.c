@@ -195,6 +195,7 @@ struct cm3629_info {
 	uint32_t ws_gadc;
 	uint16_t w_golden_adc;
 	uint32_t *correction_table;
+	int ps_stop_polling;
 };
 
 #if defined(CONFIG_FB)
@@ -1026,9 +1027,10 @@ static void polling_do_work(struct work_struct *w)
 			" cmd[0] = 0x%x, cmd[1] = 0x%x, avg_min_adc = %d\n",
 			lpi->ps1_thd_set, cmd[0], cmd[1], avg_min_adc);
 	}
-
-	queue_delayed_work(lpi->lp_wq, &polling_work,
-		msecs_to_jiffies(POLLING_DELAY));
+	if (!lpi->ps_stop_polling) {
+		queue_delayed_work(lpi->lp_wq, &polling_work,
+			msecs_to_jiffies(POLLING_DELAY));
+	}
 }
 #endif
 
@@ -3068,6 +3070,7 @@ static int __devinit cm3629_probe(struct i2c_client *client,
 	lpi->emmc_ps_kadc1 = pdata->emmc_ps_kadc1;
 	lpi->emmc_ps_kadc2 = pdata->emmc_ps_kadc2;
 	lpi->use__PS2v85 = pdata->use__PS2v85;
+	lpi->ps_stop_polling = 0;
 	lp_info = lpi;
 
 	ret = cm3629_read_chip_id(lpi);
@@ -3308,6 +3311,33 @@ err_alloc_data_failed:
 	return ret;
 
 }
+static int cm3629_suspend(struct device *dev)
+{
+	struct cm3629_info *lpi = lp_info;
+
+	D("[PS][cm3629] cm3629_suspend\n");
+	lpi->ps_stop_polling = 1;
+	cancel_delayed_work(&polling_work);
+	return 0;
+}
+static int cm3629_resume(struct device *dev)
+{
+	struct cm3629_info *lpi = lp_info;
+
+	D("[PS][cm3629] cm3629_resume\n");
+	lpi->ps_stop_polling = 0;
+	if (lpi->dynamical_threshold == 1 && lpi->mfg_mode != MFG_MODE
+			&& lpi->ps_enable && pocket_mode_flag != 1 && psensor_enable_by_touch != 1) {
+		queue_delayed_work(lpi->lp_wq, &polling_work,
+				msecs_to_jiffies(POLLING_DELAY));
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops cm3629_pm_ops = {
+	.suspend = cm3629_suspend,
+	.resume = cm3629_resume
+};
 
 static struct i2c_device_id cm3629_i2c_id[] = {
 	{"CM3629", 0},
@@ -3324,6 +3354,7 @@ static struct i2c_driver cm3629_driver = {
 	.driver = {
 		.name = "CM3629",
 		.owner = THIS_MODULE,
+		.pm = &cm3629_pm_ops,
 #ifdef CONFIG_OF
 		.of_match_table = cm3629_match_table,
 #endif

@@ -375,7 +375,6 @@ static struct platform_driver ci13xxx_msm_driver = {
 		.name = "msm_hsusb",
 	},
 	.remove = ci13xxx_msm_remove,
-	.shutdown = ci13xxx_msm_shutdown,
 };
 MODULE_ALIAS("platform:msm_hsusb");
 

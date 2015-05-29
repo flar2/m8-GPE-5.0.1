@@ -19,10 +19,10 @@ enum {
 	NLA_NESTED_COMPAT,
 	NLA_NUL_STRING,
 	NLA_BINARY,
-    NLA_S8,
-    NLA_S16,
-    NLA_S32,
-    NLA_S64,
+	NLA_S8,
+	NLA_S16,
+	NLA_S32,
+	NLA_S64,
 	__NLA_TYPE_MAX,
 };
 
@@ -342,22 +342,22 @@ static inline int nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
 
 static inline int nla_put_s8(struct sk_buff *skb, int attrtype, s8 value)
 {
-    return nla_put(skb, attrtype, sizeof(s8), &value);
+	return nla_put(skb, attrtype, sizeof(s8), &value);
 }
 
 static inline int nla_put_s16(struct sk_buff *skb, int attrtype, s16 value)
 {
-    return nla_put(skb, attrtype, sizeof(s16), &value);
+	return nla_put(skb, attrtype, sizeof(s16), &value);
 }
 
 static inline int nla_put_s32(struct sk_buff *skb, int attrtype, s32 value)
 {
-    return nla_put(skb, attrtype, sizeof(s32), &value);
+	return nla_put(skb, attrtype, sizeof(s32), &value);
 }
 
 static inline int nla_put_s64(struct sk_buff *skb, int attrtype, s64 value)
 {
-    return nla_put(skb, attrtype, sizeof(s64), &value);
+	return nla_put(skb, attrtype, sizeof(s64), &value);
 }
 
 static inline int nla_put_string(struct sk_buff *skb, int attrtype,
@@ -479,26 +479,29 @@ static inline __be64 nla_get_be64(const struct nlattr *nla)
 
 	return tmp;
 }
+
 static inline s32 nla_get_s32(const struct nlattr *nla)
 {
-    return *(s32 *) nla_data(nla);
+	return *(s32 *) nla_data(nla);
 }
 
 static inline s16 nla_get_s16(const struct nlattr *nla)
 {
-    return *(s16 *) nla_data(nla);
+	return *(s16 *) nla_data(nla);
 }
 
 static inline s8 nla_get_s8(const struct nlattr *nla)
 {
-    return *(s8 *) nla_data(nla);
+	return *(s8 *) nla_data(nla);
 }
 
 static inline s64 nla_get_s64(const struct nlattr *nla)
 {
-    s64 tmp;
-    nla_memcpy(&tmp, nla, sizeof(tmp));
-    return tmp;
+	s64 tmp;
+
+	nla_memcpy(&tmp, nla, sizeof(tmp));
+
+	return tmp;
 }
 
 static inline int nla_get_flag(const struct nlattr *nla)

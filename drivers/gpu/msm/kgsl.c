@@ -400,6 +400,25 @@ static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry)
 	entry->priv = NULL;
 }
 
+void kgsl_context_dump(struct kgsl_context *context)
+{
+	struct kgsl_device *device;
+
+	if (_kgsl_context_get(context) == 0)
+		return;
+
+	device = context->device;
+
+	if (kgsl_context_detached(context)) {
+		dev_err(device->dev, "  context[%d]: context detached\n",
+			context->id);
+	} else if (device->ftbl->drawctxt_dump != NULL)
+		device->ftbl->drawctxt_dump(device, context);
+
+	kgsl_context_put(context);
+}
+EXPORT_SYMBOL(kgsl_context_dump);
+
 int kgsl_context_init(struct kgsl_device_private *dev_priv,
 			struct kgsl_context *context)
 {
@@ -1280,21 +1299,10 @@ struct kgsl_cmdbatch_sync_event {
 	struct kref refcount;
 };
 
-static void _kgsl_cmdbatch_timer(unsigned long data)
+void kgsl_dump_syncpoints(struct kgsl_device *device,
+	struct kgsl_cmdbatch *cmdbatch)
 {
-	struct kgsl_cmdbatch *cmdbatch = (struct kgsl_cmdbatch *) data;
 	struct kgsl_cmdbatch_sync_event *event;
-
-	if (cmdbatch == NULL || cmdbatch->context == NULL)
-		return;
-
-	spin_lock(&cmdbatch->lock);
-	if (list_empty(&cmdbatch->synclist))
-		goto done;
-
-	pr_err("kgsl: possible gpu syncpoint deadlock for context %d timestamp %d\n",
-		cmdbatch->context->id, cmdbatch->timestamp);
-	pr_err(" Active sync points:\n");
 
 	
 	list_for_each_entry(event, &cmdbatch->synclist, node) {
@@ -1306,15 +1314,67 @@ static void _kgsl_cmdbatch_timer(unsigned long data)
 			 retired = kgsl_readtimestamp(event->device,
 				event->context, KGSL_TIMESTAMP_RETIRED);
 
-			pr_err("  [timestamp] context %d timestamp %d (retired %d)\n",
+			dev_err(device->dev,
+				"  [timestamp] context %d timestamp %d (retired %d)\n",
 				event->context->id, event->timestamp,
 				retired);
 			break;
 		}
 		case KGSL_CMD_SYNCPOINT_TYPE_FENCE:
-			pr_err("  fence: [%p] %s\n", event->handle,
-				(event->handle && event->handle->fence)
-					? event->handle->fence->name : "NULL");
+			if (event->handle)
+				dev_err(device->dev, "  fence: [%p] %s\n",
+					event->handle->fence,
+					event->handle->name);
+			else
+				dev_err(device->dev, "  fence: invalid\n");
+			break;
+		}
+	}
+}
+
+static void _kgsl_cmdbatch_timer(unsigned long data)
+{
+	struct kgsl_device *device;
+	struct kgsl_cmdbatch *cmdbatch = (struct kgsl_cmdbatch *) data;
+	struct kgsl_cmdbatch_sync_event *event;
+
+	if (cmdbatch == NULL || cmdbatch->context == NULL)
+		return;
+
+	spin_lock(&cmdbatch->lock);
+	if (list_empty(&cmdbatch->synclist))
+		goto done;
+
+	device = cmdbatch->context->device;
+
+	dev_err(device->dev,
+		"kgsl: possible gpu syncpoint deadlock for context %d timestamp %d\n",
+		cmdbatch->context->id, cmdbatch->timestamp);
+	dev_err(device->dev, " Active sync points:\n");
+
+	
+	list_for_each_entry(event, &cmdbatch->synclist, node) {
+		switch (event->type) {
+		case KGSL_CMD_SYNCPOINT_TYPE_TIMESTAMP: {
+			unsigned int retired;
+
+			retired = kgsl_readtimestamp(event->device,
+				event->context, KGSL_TIMESTAMP_RETIRED);
+
+			dev_err(device->dev,
+				"  [timestamp] context %d timestamp %d (retired %d)\n",
+				event->context->id, event->timestamp, retired);
+			break;
+		}
+		case KGSL_CMD_SYNCPOINT_TYPE_FENCE:
+			if (event->handle && event->handle->fence) {
+				set_bit(CMDBATCH_FLAG_FENCE_LOG,
+					&cmdbatch->priv);
+				kgsl_sync_fence_log(event->handle->fence);
+				clear_bit(CMDBATCH_FLAG_FENCE_LOG,
+					&cmdbatch->priv);
+			} else
+				dev_err(device->dev, "  fence: invalid\n");
 			break;
 		}
 	}
@@ -1390,6 +1450,9 @@ static void kgsl_cmdbatch_sync_func(struct kgsl_device *device, void *priv,
 {
 	struct kgsl_cmdbatch_sync_event *event = priv;
 
+	trace_syncpoint_timestamp_expire(event->cmdbatch,
+		event->context, event->timestamp);
+
 	kgsl_cmdbatch_sync_expire(device, event);
 	kgsl_context_put(event->context);
 	
@@ -1434,6 +1497,9 @@ static void kgsl_cmdbatch_sync_fence_func(void *priv)
 {
 	struct kgsl_cmdbatch_sync_event *event = priv;
 
+	trace_syncpoint_fence_expire(event->cmdbatch,
+		event->handle ? event->handle->name : "unknown");
+
 	kgsl_cmdbatch_sync_expire(event->device, event);
 	
 	kgsl_cmdbatch_sync_event_put(event);
@@ -1470,9 +1536,10 @@ static int kgsl_cmdbatch_add_sync_fence(struct kgsl_device *device,
 	event->handle = kgsl_sync_fence_async_wait(sync->fd,
 		kgsl_cmdbatch_sync_fence_func, event);
 
-
 	if (IS_ERR_OR_NULL(event->handle)) {
 		int ret = PTR_ERR(event->handle);
+
+		event->handle = NULL;
 
 		
 		kgsl_cmdbatch_sync_event_put(event);
@@ -1486,8 +1553,13 @@ static int kgsl_cmdbatch_add_sync_fence(struct kgsl_device *device,
 		
 		kgsl_cmdbatch_sync_event_put(event);
 
+		if (ret == 0)
+			trace_syncpoint_fence_expire(cmdbatch, "signaled");
+
 		return ret;
 	}
+
+	trace_syncpoint_fence(cmdbatch, event->handle->name);
 
 	kgsl_cmdbatch_sync_event_put(event);
 
@@ -1552,6 +1624,8 @@ static int kgsl_cmdbatch_add_sync_timestamp(struct kgsl_device *device,
 
 		kgsl_cmdbatch_put(cmdbatch);
 		kfree(event);
+	} else {
+		trace_syncpoint_timestamp(cmdbatch, context, sync->timestamp);
 	}
 
 done:
@@ -1788,8 +1862,11 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 		cmdbatch, &param->timestamp);
 
 free_cmdbatch:
-	if (result && result != -EPROTO)
+	if (result && result != -EPROTO) {
+		kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 		kgsl_cmdbatch_destroy(cmdbatch);
+		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
+	}
 
 done:
 	kgsl_context_put(context);
@@ -1836,8 +1913,11 @@ static long kgsl_ioctl_submit_commands(struct kgsl_device_private *dev_priv,
 		cmdbatch, &param->timestamp);
 
 free_cmdbatch:
-	if (result && result != -EPROTO)
+	if (result && result != -EPROTO) {
+		kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 		kgsl_cmdbatch_destroy(cmdbatch);
+		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
+	}
 
 done:
 	kgsl_context_put(context);
@@ -2735,6 +2815,8 @@ kgsl_ioctl_sharedmem_flush_cache(struct kgsl_device_private *dev_priv,
 	return ret;
 }
 
+#define KGSL_MAX_ALIGN (32 * SZ_1M)
+
 int
 _gpumem_alloc(struct kgsl_device_private *dev_priv,
 		struct kgsl_mem_entry **ret_entry,
@@ -2755,11 +2837,13 @@ _gpumem_alloc(struct kgsl_device_private *dev_priv,
 	
 
 	align = (flags & KGSL_MEMALIGN_MASK) >> KGSL_MEMALIGN_SHIFT;
-	if (align >= 32) {
-		KGSL_CORE_ERR("Alignment too big, restricting to 2^31\n");
+	if (align >= ilog2(KGSL_MAX_ALIGN)) {
+		KGSL_CORE_ERR("Alignment too large; restricting to %dK\n",
+			KGSL_MAX_ALIGN >> 10);
 
 		flags &= ~KGSL_MEMALIGN_MASK;
-		flags |= (31 << KGSL_MEMALIGN_SHIFT) & KGSL_MEMALIGN_MASK;
+		flags |= (ilog2(KGSL_MAX_ALIGN) << KGSL_MEMALIGN_SHIFT) &
+			KGSL_MEMALIGN_MASK;
 	}
 
 	entry = kgsl_mem_entry_create();

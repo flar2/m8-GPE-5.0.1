@@ -37,10 +37,12 @@
 #include <mach/htc_acoustic_pmic.h>
 #include <linux/jiffies.h>
 
+//htc audio ++
 #undef pr_info
 #undef pr_err
 #define pr_info(fmt, ...) pr_aud_info(fmt, ##__VA_ARGS__)
 #define pr_err(fmt, ...) pr_aud_err(fmt, ##__VA_ARGS__)
+//htc audio --
 
 #ifdef CONFIG_AMP_RT5501_ON_GPIO
 #define DEBUG (1)
@@ -264,8 +266,8 @@ static int rt5501_i2c_write(struct rt5501_reg_data *txData, int length)
 		},
 	};
 	for (i = 0; i < length; i++) {
-		
-		
+		//if (i == 2)  /* According to rt5501 Spec */
+		//	mdelay(1);
 		buf[0] = txData[i].addr;
 		buf[1] = txData[i].val;
 
@@ -306,8 +308,8 @@ static int rt5501_i2c_write_for_read(char *txData, int length)
 		},
 	};
 	for (i = 0; i < length; i++) {
-		
-		
+		//if (i == 2)  /* According to rt5501 Spec */
+		//	mdelay(1);
 		buf[0] = i;
 		buf[1] = txData[i];
 #if DEBUG
@@ -397,6 +399,12 @@ static int rt5501_i2c_read_addr(char *rxData, unsigned char addr)
 		return rc;
 	}
 
+	/*{
+		int i = 0;
+		for (i = 0; i < length; i++)
+			pr_info("i2c_read %s: rx[%d] = %2x\n", __func__, i, \
+				rxData[i]);
+	}*/
         pr_info("%s:i2c_read addr 0x%x value = 0x%x\n", __func__, addr, *rxData);
 	return 0;
 }
@@ -561,7 +569,7 @@ static void hs_imp_detec_func(struct work_struct *work)
 			om = (temp[0] & 0xe) >> 1;
 
 			if((temp[0] == 0xc0 || temp[0] == 0xc1) && (temp[1] == 0)) {
-				
+				//mono headset
 				hsom = HEADSET_MONO;
 			} else {
 
@@ -674,7 +682,7 @@ static void volume_ramp_func(struct work_struct *work)
 		u8 val;
 		pr_info("%s: ramping-------------------------\n",__func__);
 		mdelay(1);
-		
+		//start state machine and disable noise gate
 		if(high_imp)
 			rt5501_write_reg(0xb1,0x80);
 
@@ -842,7 +850,7 @@ static long rt5501_ioctl(struct file *file, unsigned int cmd,
 		pr_info("%s: RT5501_WRITE_REG\n", __func__);
 		mutex_lock(&hp_amp_lock);
 		if (!last_spkamp_state) {
-			
+			/* According to rt5501 Spec */
 			mdelay(30);
 		}
 		if (copy_from_user(reg_value, argp, sizeof(reg_value)))
@@ -864,7 +872,7 @@ err1:
 	case RT5501_READ_CONFIG:
 		mutex_lock(&hp_amp_lock);
 		if (!last_spkamp_state) {
-			
+			/* According to rt5501 Spec */
 			mdelay(30);
 		}
 
@@ -933,12 +941,12 @@ err2:
 
 		pr_info("%s: update rt5501 i2c commands #%d success.\n",
 				__func__, rt5501_config_data.mode_num);
-		
+		/* update default paramater from csv*/
                 mutex_lock(&hp_amp_lock);
 		update_amp_parameter(RT5501_MODE_OFF);
 		update_amp_parameter(RT5501_MUTE);
 		update_amp_parameter(RT5501_INIT);
-		
+		//update_amp_parameter(RT5501_MODE_MFG);
                 mutex_unlock(&hp_amp_lock);
 		rc = 0;
 		break;

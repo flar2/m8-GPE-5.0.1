@@ -467,6 +467,9 @@ static void htc_8974_add_usb_devices(void)
 #elif defined(CONFIG_MACH_DUMMY)
 		android_usb_pdata.nluns = 2;
 		android_usb_pdata.cdrom_lun = 0x2;
+#elif defined(CONFIG_MACH_DUMMY)
+		android_usb_pdata.nluns = 2;
+		android_usb_pdata.cdrom_lun = 0x2;
 #else
 		android_usb_pdata.nluns = 1;
 		android_usb_pdata.cdrom_lun = 0x1;
@@ -487,13 +490,23 @@ static void htc_8974_add_usb_devices(void)
 #elif defined(CONFIG_MACH_DUMMY)
 	android_usb_pdata.product_id	= 0x0643;
 #elif defined(CONFIG_MACH_DUMMY)
-	android_usb_pdata.product_id	= 0x063A;
+	android_usb_pdata.product_id	= 0x0635;
+#elif defined(CONFIG_MACH_DUMMY)
+	android_usb_pdata.product_id	= 0x0638;
+#elif defined(CONFIG_MACH_DUMMY)
+	android_usb_pdata.product_id	= 0x0636;
 #elif defined(CONFIG_MACH_DUMMY)
 	android_usb_pdata.product_id	= 0x0634;
 #elif defined(CONFIG_MACH_DUMMY)
 	android_usb_pdata.product_id	= 0x0642;
 #elif defined(CONFIG_MACH_DUMMY)
-	android_usb_pdata.product_id	= 0x0642;
+	android_usb_pdata.product_id	= 0x0644;
+#elif defined(CONFIG_MACH_DUMMY)
+	android_usb_pdata.product_id	= 0x0646;
+#elif defined(CONFIG_MACH_DUMMY)
+	android_usb_pdata.product_id	= 0x0651;
+#elif defined(CONFIG_MACH_DUMMY)
+	android_usb_pdata.product_id	= 0x064C;
 #else
 	
 #endif
@@ -505,7 +518,7 @@ static void htc_8974_add_usb_devices(void)
 
 	platform_device_register(&android_usb_device);
 }
-#if (defined(CONFIG_MACH_DUMMY) || defined(CONFIG_MACH_DUMMY))
+#if 0
 static ssize_t syn_vkeys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
@@ -615,6 +628,9 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.normal_usb_temp_threshold = 450, 
 	.usb_temp_overheat_threshold = 650,
 #endif
+#if (defined(CONFIG_MACH_DUMMY) || defined(CONFIG_MACH_DUMMY) || defined(CONFIG_MACH_DUMMY))
+	.disable_pwrpath_after_eoc = 1,
+#endif
 	
 	.icharger.name = "pm8941",
 	.icharger.get_charging_source = pm8941_get_charging_source,
@@ -647,6 +663,7 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 						pm8941_get_input_voltage_regulation,
 	.icharger.store_battery_charger_data = pm8941_store_battery_charger_data_emmc,
 	.icharger.set_ftm_charge_enable_type = pm8941_set_ftm_charge_enable_type,
+	.icharger.set_charger_after_eoc = pm8941_set_charger_after_eoc,
 	
 	.igauge.name = "pm8941",
 	.igauge.get_battery_voltage = pm8941_get_batt_voltage,
@@ -719,7 +736,7 @@ void __init htc_8974_add_drivers(void)
 	htc_batt_cell_register();
 	msm8974_add_batt_devices();
 #endif 
-#if (defined(CONFIG_MACH_DUMMY) || defined(CONFIG_MACH_DUMMY))
+#if 0
 	syn_init_vkeys_8974();
 #endif
 	htc_8974_cable_detect_register();

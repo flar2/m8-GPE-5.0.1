@@ -319,7 +319,6 @@ struct mmc_card {
 #define MMC_STATE_HIGHSPEED_400	(1<<9)		
 #define MMC_STATE_DOING_BKOPS	(1<<10)		
 #define MMC_STATE_NEED_BKOPS	(1<<11)		
-#define MMC_STATE_NEED_BKOPS_IN_SUSPEND   (1<<31)         
 	unsigned int		quirks; 	
 #define MMC_QUIRK_LENIENT_FN0	(1<<0)		
 #define MMC_QUIRK_BLKSZ_FOR_BYTE_MODE (1<<1)	
@@ -522,7 +521,6 @@ static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
 #define mmc_card_removed(c)	((c) && ((c)->state & MMC_CARD_REMOVED))
 #define mmc_card_doing_bkops(c)	((c)->state & MMC_STATE_DOING_BKOPS)
 #define mmc_card_need_bkops(c)	((c)->state & MMC_STATE_NEED_BKOPS)
-#define mmc_card_need_bkops_in_suspend(c) ((c)->state & MMC_STATE_NEED_BKOPS_IN_SUSPEND)
 
 #define mmc_card_set_present(c)	((c)->state |= MMC_STATE_PRESENT)
 #define mmc_card_set_readonly(c) ((c)->state |= MMC_STATE_READONLY)
@@ -543,8 +541,6 @@ static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
 #define mmc_card_clr_doing_bkops(c)	((c)->state &= ~MMC_STATE_DOING_BKOPS)
 #define mmc_card_set_need_bkops(c)	((c)->state |= MMC_STATE_NEED_BKOPS)
 #define mmc_card_clr_need_bkops(c)	((c)->state &= ~MMC_STATE_NEED_BKOPS)
-#define mmc_card_set_need_bkops_in_suspend(c)     ((c)->state |= MMC_STATE_NEED_BKOPS_IN_SUSPEND)
-#define mmc_card_clr_need_bkops_in_suspend(c)     ((c)->state &= ~MMC_STATE_NEED_BKOPS_IN_SUSPEND)
 
 static inline void __maybe_unused add_quirk_mmc(struct mmc_card *card, int data)
 {

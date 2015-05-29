@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1551,6 +1551,11 @@ static void msm_actuator_write_focus(
 	uint16_t wait_time = 0;
 	CDBG("Enter\n");
 
+       if(NULL == a_ctrl || NULL == damping_params)
+       {
+           printk("%s: a_ctrl = %p, damping_params = %p \n", __func__, a_ctrl, damping_params);
+           return;
+       }
 	damping_code_step = damping_params->damping_step;
 	wait_time = damping_params->damping_delay;
 

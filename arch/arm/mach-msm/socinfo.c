@@ -707,6 +707,8 @@ socinfo_show_platform_subtype(struct sys_device *dev,
 			char *buf)
 {
 	uint32_t hw_subtype;
+	WARN_ONCE(1, "Deprecated, use platform_subtype_id instead\n");
+
 	if (!socinfo) {
 		pr_err("%s: No socinfo found!\n", __func__);
 		return 0;
@@ -733,6 +735,18 @@ socinfo_show_platform_subtype(struct sys_device *dev,
 	}
 	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
 		hw_platform_subtype[hw_subtype]);
+}
+
+static ssize_t
+socinfo_show_platform_subtype_id(struct sys_device *dev,
+			struct sysdev_attribute *attr,
+			char *buf)
+{
+	uint32_t hw_subtype;
+
+	hw_subtype = socinfo_get_platform_subtype();
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		hw_subtype);
 }
 
 static ssize_t
@@ -855,6 +869,17 @@ msm_get_platform_subtype(struct device *dev,
 
 	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
 		hw_platform_subtype[hw_subtype]);
+}
+
+static ssize_t
+msm_get_platform_subtype_id(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	uint32_t hw_subtype;
+	hw_subtype = socinfo_get_platform_subtype();
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		hw_subtype);
 }
 
 static ssize_t
@@ -1012,6 +1037,8 @@ static struct sysdev_attribute socinfo_v5_files[] = {
 static struct sysdev_attribute socinfo_v6_files[] = {
 	_SYSDEV_ATTR(platform_subtype, 0444,
 			socinfo_show_platform_subtype, NULL),
+	_SYSDEV_ATTR(platform_subtype_id, 0444,
+			socinfo_show_platform_subtype_id, NULL),
 };
 
 static struct sysdev_attribute socinfo_v7_files[] = {
@@ -1096,6 +1123,10 @@ static struct device_attribute msm_soc_attr_accessory_chip =
 static struct device_attribute msm_soc_attr_platform_subtype =
 	__ATTR(platform_subtype, S_IRUGO,
 			msm_get_platform_subtype, NULL);
+
+static struct device_attribute msm_soc_attr_platform_subtype_id =
+	__ATTR(platform_subtype_id, S_IRUGO,
+			msm_get_platform_subtype_id, NULL);
 
 static struct device_attribute msm_soc_attr_foundry_id =
 	__ATTR(foundry_id, S_IRUGO,
@@ -1197,6 +1228,8 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 	case 6:
 		device_create_file(msm_soc_device,
 					&msm_soc_attr_platform_subtype);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_platform_subtype_id);
 	case 5:
 		device_create_file(msm_soc_device,
 					&msm_soc_attr_accessory_chip);

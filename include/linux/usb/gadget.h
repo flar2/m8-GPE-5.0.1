@@ -348,6 +348,7 @@ struct usb_gadget {
 	bool				l1_supported;
 	bool				streaming_enabled;
 	unsigned		ats_reset_irq_count;
+	u32				xfer_isr_count;
 };
 
 static inline void set_gadget_data(struct usb_gadget *gadget, void *data)

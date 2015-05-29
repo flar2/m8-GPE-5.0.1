@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,7 @@
 #include <mach/qdsp6v2/rtac.h>
 #include <sound/q6asm-v2.h>
 #include <sound/q6afe-v2.h>
+#include <sound/q6audio-v2.h>
 #include <sound/apr_audio-v2.h>
 #include "q6voice.h"
 #include "audio_acdb.h"
@@ -151,6 +152,7 @@ struct mutex			rtac_adm_apr_mutex;
 struct mutex			rtac_asm_apr_mutex;
 struct mutex			rtac_voice_mutex;
 struct mutex			rtac_voice_apr_mutex;
+struct mutex			rtac_ioctl_mutex;
 
 int rtac_clear_mapping(uint32_t cal_type)
 {
@@ -818,6 +820,7 @@ u32 send_adm_apr(void *buf, u32 opcode)
 	u32	bytes_returned = 0;
 	u32	port_index = 0;
 	u32	copp_id;
+	int	port_id;
 	u32	payload_size;
 	u32	data_size = 0;
 	struct apr_hdr	adm_params;
@@ -876,6 +879,13 @@ u32 send_adm_apr(void *buf, u32 opcode)
 		       __func__, copp_id);
 		goto done;
 	}
+	port_id = q6audio_get_port_id_from_index(port_index);
+
+	if (port_id < 0) {
+		pr_err("%s: Could not find port id mapped for port_idx %d\n",
+		       __func__, port_index);
+		goto done;
+	}
 
 	mutex_lock(&rtac_adm_apr_mutex);
 	if (rtac_adm_apr_data.apr_handle == NULL) {
@@ -932,7 +942,7 @@ u32 send_adm_apr(void *buf, u32 opcode)
 	adm_params.dest_svc = APR_SVC_ADM;
 	adm_params.dest_domain = APR_DOMAIN_ADSP;
 	adm_params.dest_port = copp_id;
-	adm_params.token = copp_id;
+	adm_params.token = port_id;
 	adm_params.opcode = opcode;
 
 	
@@ -1432,6 +1442,7 @@ static long rtac_ioctl(struct file *f,
 		goto done;
 	}
 
+	mutex_lock(&rtac_ioctl_mutex);
 	switch (cmd) {
 	case AUDIO_GET_RTAC_ADM_INFO:
 		if (copy_to_user((void *)arg, &rtac_adm_data,
@@ -1488,6 +1499,7 @@ static long rtac_ioctl(struct file *f,
 		pr_err("%s: Invalid IOCTL, command = %d!\n",
 		       __func__, cmd);
 	}
+	mutex_unlock(&rtac_ioctl_mutex);
 done:
 	return result;
 }
@@ -1568,6 +1580,8 @@ static int __init rtac_init(void)
 		kzfree(rtac_asm_buffer);
 		goto nomem;
 	}
+
+	mutex_init(&rtac_ioctl_mutex);
 
 	return misc_register(&rtac_misc);
 nomem:

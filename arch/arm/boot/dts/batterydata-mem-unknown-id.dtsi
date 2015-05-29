@@ -1,4 +1,4 @@
-	qcom,J1-unknown-id-batterydata {
+	qcom,MEM-unknown-id-batterydata {
 	qcom,fcc-mah = <1800>;
 	qcom,default-rbatt-mohm = <172>;
 	qcom,rbatt-capacitive-mohm = <0>;

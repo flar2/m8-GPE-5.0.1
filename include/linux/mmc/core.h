@@ -129,8 +129,6 @@ extern int mmc_wait_for_cmd(struct mmc_host *, struct mmc_command *, int);
 extern int mmc_app_cmd(struct mmc_host *, struct mmc_card *);
 extern int mmc_wait_for_app_cmd(struct mmc_host *, struct mmc_card *,
 	struct mmc_command *, int);
-extern int mmc_card_start_bkops(struct mmc_card *host);
-extern int mmc_card_stop_bkops(struct mmc_card *card);
 extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
 extern void mmc_start_delayed_bkops(struct mmc_card *card);
 extern void mmc_start_idle_time_bkops(struct work_struct *work);

@@ -148,7 +148,9 @@ struct synaptics_ts_data {
 	uint32_t raw_ref;
 	uint64_t timestamp;
 	uint16_t *filter_level;
+#ifdef CONFIG_MOTION_FILTER
 	uint8_t *reduce_report_level;
+#endif
 	unsigned long tap_timeout[10];
 	int16_t *report_data;
 	int32_t *report_data_32;
@@ -2549,8 +2551,11 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 				ts->ambiguous_state = 0;
 			ts->grip_b_suppression = 0;
 #endif
+
+#ifdef CONFIG_MOTION_FILTER
 			if (ts->reduce_report_level[0])
 				ts->tap_suppression = 0;
+#endif
 			if (ts->debug_log_level & BIT(1))
 				pr_info("[TP] Finger leave\n");
 		}
@@ -2619,6 +2624,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 					} else
 #endif
 
+#ifdef CONFIG_MOTION_FILTER
 					if (ts->htc_event == SYN_AND_REPORT_TYPE_B && ts->reduce_report_level[0]) {
 						if (ts->tap_suppression & BIT(i) && finger_pressed & BIT(i)) {
 							int dx, dy = 0;
@@ -2637,6 +2643,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 							}
 						}
 					}
+#endif
 
 					if ((finger_pressed & BIT(i)) == BIT(i)) {
 					if (ts->hall_block_touch_event == 0) {
@@ -2739,6 +2746,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 							}
 						}
 
+#ifdef CONFIG_MOTION_FILTER
 						if (ts->htc_event == SYN_AND_REPORT_TYPE_B && ts->reduce_report_level[TAP_DX_OUTER]) {
 							if (finger_press_changed & BIT(i)) {
 								ts->tap_suppression &= ~BIT(i);
@@ -2749,6 +2757,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 									ts->tap_timeout[i] = jiffies + msecs_to_jiffies(ts->reduce_report_level[TAP_TIMEOUT]);
 							}
 						}
+#endif
 
 						if (ts->debug_log_level & BIT(1))
 							pr_info("[TP] Finger %d=> X:%d, Y:%d W:%d, Z:%d\n",
@@ -4130,7 +4139,9 @@ static int __devinit synaptics_ts_probe(
 		ts->flags                          = pdata->flags;
 		ts->htc_event                      = pdata->report_type;
 		ts->filter_level                   = pdata->filter_level;
+#ifdef CONFIG_MOTION_FILTER
 		ts->reduce_report_level            = pdata->reduce_report_level;
+#endif
 		ts->gpio_irq                       = pdata->gpio_irq;
 		ts->gpio_reset                     = pdata->gpio_reset;
 		ts->gpio_i2c                       = pdata->gpio_i2c;
