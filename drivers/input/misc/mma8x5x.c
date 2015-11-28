@@ -39,9 +39,10 @@
 #define MMA8652_ID			0x4A
 #define MMA8653_ID			0x5A
 
+/* Polling delay in msecs */
 #define POLL_INTERVAL_MIN	1
 #define POLL_INTERVAL_MAX	10000
-#define POLL_INTERVAL		100 
+#define POLL_INTERVAL		100 /* msecs */
 
 #define INPUT_FUZZ			32
 #define INPUT_FLAT			32
@@ -109,6 +110,7 @@ static struct mma_odr_selection_table mma_odr_table[] = {
 	{0x38, 400001, 10000000},
 };
 
+/* register enum for mma8x5x registers */
 enum {
 	MMA8X5X_STATUS = 0x00,
 	MMA8X5X_OUT_X_MSB,
@@ -165,6 +167,10 @@ enum {
 	MMA8X5X_REG_END,
 };
 
+/* The sensitivity is represented in counts/g. In 2g mode the
+sensitivity is 1024 counts/g. In 4g mode the sensitivity is 512
+counts/g and in 8g mode the sensitivity is 256 counts/g.
+ */
 enum {
 	MODE_2G = 0,
 	MODE_4G,
@@ -195,6 +201,7 @@ struct mma8x5x_data {
 	int poll_delay;
 	bool use_int;
 };
+/* Addresses scanned */
 static const unsigned short normal_i2c[] = {0x1c, 0x1d, I2C_CLIENT_END};
 
 static int mma8x5x_chip_id[] = {
@@ -354,6 +361,10 @@ static int mma8x5x_device_start(struct i2c_client *client)
 			pdata->mode))
 		goto err_out;
 
+	/* The BT(boot time) for mma8x5x is 1.55ms according to
+	  *Freescale mma8450Q document. Document Number:MMA8450Q
+	  *Rev: 9.1, 04/2012
+	  */
 	usleep_range(1600, 2000);
 	return 0;
 
@@ -387,7 +398,7 @@ static int mma8x5x_device_set_odr(struct i2c_client *client, u32 delay_ms)
 	int result;
 	u8 val;
 
-	
+	/* set ODR is only required for interrupt mode */
 	if (!pdata->use_int)
 		return 0;
 
@@ -594,6 +605,10 @@ static int mma8x5x_enable_set(struct sensors_classdev *sensors_cdev,
 				dev_err(&client->dev, "change device state failed!");
 				goto err_failed;
 			}
+			/*
+			 * Set standby state,
+			 * polling work queue will stop after next call.
+			 */
 			pdata->active = MMA_STANDBY;
 			dev_dbg(&client->dev, "%s:mma enable setting inactive.\n",
 					__func__);
@@ -821,7 +836,7 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 	struct mma8x5x_data *pdata;
 	struct i2c_adapter *adapter;
 	adapter = to_i2c_adapter(client->dev.parent);
-	
+	/* power on the device */
 	result = mma8x5x_config_regulator(client, 1);
 	if (result)
 		goto err_power_on;
@@ -842,7 +857,7 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 		result = -EINVAL;
 		goto err_check_id;
 	}
-	
+	/* set the private data */
 	pdata = kzalloc(sizeof(struct mma8x5x_data), GFP_KERNEL);
 	if (!pdata) {
 		result = -ENOMEM;
@@ -860,7 +875,7 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 		pdata->int_flags = 0;
 	}
 
-	
+	/* Initialize the MMA8X5X chip */
 	pdata->client = client;
 	pdata->chip_id = chip_id;
 	pdata->mode = MODE_2G;
@@ -868,7 +883,7 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 
 	mutex_init(&pdata->data_lock);
 	i2c_set_clientdata(client, pdata);
-	
+	/* Initialize the MMA8X5X chip */
 	mma8x5x_device_init(client);
 	if (pdata->use_int) {
 		if (pdata->int_pin >= 0)
@@ -1005,7 +1020,7 @@ static int mma8x5x_suspend(struct device *dev)
 	if (pdata->active & MMA_SHUTTEDDOWN)
 		return 0;
 	if (!mma8x5x_config_regulator(client, 0))
-		
+		/* The highest bit sotres the power state */
 		pdata->active |= MMA_SHUTTEDDOWN;
 	return 0;
 }
@@ -1018,7 +1033,7 @@ static int mma8x5x_resume(struct device *dev)
 
 	if (pdata->use_int && pdata->active == MMA_ACTIVED)
 		return 0;
-	
+	/* No need to power on while device is shutdowned from standby state */
 	if (pdata->active == (MMA_SHUTTEDDOWN | MMA_STANDBY))
 		return 0;
 	if (pdata->active & MMA_SHUTTEDDOWN) {
@@ -1073,7 +1088,7 @@ static struct i2c_driver mma8x5x_driver = {
 
 static int __init mma8x5x_init(void)
 {
-	
+	/* register driver */
 	int res;
 
 	res = i2c_add_driver(&mma8x5x_driver);

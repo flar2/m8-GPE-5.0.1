@@ -603,7 +603,7 @@ static void fl_lcdev_brightness_set(struct led_classdev *led_cdev,
 		break;
 		
 		case FL_MODE_PRE_FLASH:
-			lm3643_flashlight_flash(125,50);
+			lm3643_flashlight_torch(125,50);
 		break;
 		case FL_MODE_FLASH:
 			lm3643_flashlight_flash(300,300);

@@ -27,19 +27,21 @@ static struct uts_namespace *create_uts_ns(void)
 	return uts_ns;
 }
 
-/*
- * Clone a new ns copying an original utsname, setting refcount to 1
- * @old_ns: namespace to clone
- * Return NULL on error (failure to kmalloc), new ns otherwise
- */
 static struct uts_namespace *clone_uts_ns(struct task_struct *tsk,
 					  struct uts_namespace *old_ns)
 {
 	struct uts_namespace *ns;
+	int err;
 
 	ns = create_uts_ns();
 	if (!ns)
 		return ERR_PTR(-ENOMEM);
+
+	err = proc_alloc_inum(&ns->proc_inum);
+	if (err) {
+		kfree(ns);
+		return ERR_PTR(err);
+	}
 
 	down_read(&uts_sem);
 	memcpy(&ns->name, &old_ns->name, sizeof(ns->name));
@@ -48,12 +50,6 @@ static struct uts_namespace *clone_uts_ns(struct task_struct *tsk,
 	return ns;
 }
 
-/*
- * Copy task tsk's utsname namespace, or clone it if flags
- * specifies CLONE_NEWUTS.  In latter case, changes to the
- * utsname of this process won't be seen by parent, and vice
- * versa.
- */
 struct uts_namespace *copy_utsname(unsigned long flags,
 				   struct task_struct *tsk)
 {
@@ -78,6 +74,7 @@ void free_uts_ns(struct kref *kref)
 
 	ns = container_of(kref, struct uts_namespace, kref);
 	put_user_ns(ns->user_ns);
+	proc_free_inum(ns->proc_inum);
 	kfree(ns);
 }
 
@@ -110,11 +107,18 @@ static int utsns_install(struct nsproxy *nsproxy, void *ns)
 	return 0;
 }
 
+static unsigned int utsns_inum(void *vp)
+{
+	struct uts_namespace *ns = vp;
+
+	return ns->proc_inum;
+}
+
 const struct proc_ns_operations utsns_operations = {
 	.name		= "uts",
 	.type		= CLONE_NEWUTS,
 	.get		= utsns_get,
 	.put		= utsns_put,
 	.install	= utsns_install,
+	.inum		= utsns_inum,
 };
-

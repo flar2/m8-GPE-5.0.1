@@ -61,6 +61,9 @@ struct afe_ctl {
 	int vi_rx_port;
 	uint32_t afe_sample_rates[AFE_MAX_PORTS];
 	struct aanc_data aanc_info;
+	uint32_t last_err_opcode;
+	ktime_t last_err_msg_timestamp;
+	int err_msg_cnt;
 };
 
 static atomic_t afe_ports_mad_type[SLIMBUS_PORT_LAST - SLIMBUS_0_RX];
@@ -156,9 +159,30 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		if (data->opcode == APR_BASIC_RSP_RESULT) {
 			
 			if (payload[1] != 0) {
+				ktime_t current_timestamp = ktime_get();
 				atomic_set(&this_afe.status, -1);
-				pr_err("%s: cmd = 0x%x returned error = 0x%x\n",
+#ifdef CONFIG_HTC_DEBUG_DSP
+				if (payload[0] == AFE_PORT_DATA_CMD_RT_PROXY_PORT_READ_V2) {
+					pr_err("%s: cmd = 0x%x returned error = 0x%x trigger BUG\n",
+						__func__, payload[0], payload[1]);
+					BUG();
+				}
+#endif
+				if (this_afe.last_err_opcode == payload[0]) {
+					if (ktime_to_us(ktime_sub(current_timestamp, this_afe.last_err_msg_timestamp)) > 500000) {
+						pr_err("%s: cmd = 0x%x returned error = 0x%x, err_cnt = %d\n",
+						__func__, payload[0], payload[1], this_afe.err_msg_cnt);
+						this_afe.last_err_msg_timestamp = current_timestamp;
+						this_afe.err_msg_cnt = 0;
+					} else {
+						this_afe.err_msg_cnt++;
+					}
+				} else {
+					pr_err("%s: cmd = 0x%x returned error = 0x%x\n",
 					__func__, payload[0], payload[1]);
+					this_afe.err_msg_cnt = 0;
+				}
+				this_afe.last_err_opcode = payload[0];
 			}
 			switch (payload[0]) {
 			case AFE_PORT_CMD_DEVICE_STOP:
@@ -3370,6 +3394,9 @@ static int __init afe_init(void)
 	this_afe.mmap_handle = 0;
 	this_afe.vi_tx_port = -1;
 	this_afe.vi_rx_port = -1;
+	this_afe.last_err_opcode = -1;
+	this_afe.last_err_msg_timestamp = ktime_get();
+	this_afe.err_msg_cnt =0;
 	for (i = 0; i < AFE_MAX_PORTS; i++)
 		init_waitqueue_head(&this_afe.wait[i]);
 

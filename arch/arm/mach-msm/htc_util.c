@@ -27,6 +27,8 @@
 #define FORCE_CHARGE			(1<<2)
 #define Y_CABLE			(1<<26)
 
+#define MSM_HTC_UTIL_DELAY_TIME_S_ON            60000
+
 struct process_monitor_statistic {
        unsigned int pid;
        char *ppid_name;
@@ -42,6 +44,8 @@ static int pm_monitor_enabled = 0;
 
 static struct workqueue_struct *htc_pm_monitor_wq = NULL;
 static struct workqueue_struct *htc_kernel_top_monitor_wq = NULL;
+
+static unsigned int saved_kernel_flag = 0;
 
 #define MAX_PID 32768
 #define NUM_BUSY_THREAD_CHECK 5
@@ -355,14 +359,14 @@ static void htc_xo_vddmin_stat_show(void)
 
 	if (htc_get_xo_vddmin_info(&xo_count, &xo_time, &vddmin_count, &vddmin_time)) {
 		if (xo_count > prev_xo_count) {
-			pr_debug("[K] XO: %u, %llums\n", xo_count - prev_xo_count,
+			pr_info("[K] XO: %u, %llums\n", xo_count - prev_xo_count,
 							xo_time - prev_xo_time);
 			prev_xo_count = xo_count;
 			prev_xo_time = xo_time;
 		}
 
 		if (vddmin_count > prev_vddmin_count) {
-			pr_debug("[K] Vdd-min: %u, %llums\n", vddmin_count - prev_vddmin_count,
+			pr_info("[K] Vdd-min: %u, %llums\n", vddmin_count - prev_vddmin_count,
 							vddmin_time - prev_vddmin_time);
 			prev_vddmin_count = vddmin_count;
 			prev_vddmin_time = vddmin_time;
@@ -374,11 +378,11 @@ static void htc_idle_stat_show(void)
 {
 	int i = 0, cpu = 0;
 
-	pr_debug("[K] cpu_id\tcpu_state\tidle_count\tidle_time\n");
+	pr_info("[K] cpu_id\tcpu_state\tidle_count\tidle_time\n");
 	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
 		for (i = 0; i < 3; i++) {
 			if (htc_idle_stat[cpu][i].count) {
-				pr_debug("[K]\t%d\tC%d\t\t%d\t\t%dms\n", cpu, i,
+				pr_info("[K]\t%d\tC%d\t\t%d\t\t%dms\n", cpu, i,
 					htc_idle_stat[cpu][i].count, htc_idle_stat[cpu][i].time / 1000);
 			}
 		}
@@ -557,6 +561,7 @@ static void htc_kernel_top_cal(struct _htc_kernel_top *ktop, int type)
 
 	spin_lock_irqsave(&ktop->lock, flags);
 
+	rcu_read_lock();
 	
 	for_each_process(process) {
 		thread_group_cputime(process, &cputime);
@@ -571,6 +576,7 @@ static void htc_kernel_top_cal(struct _htc_kernel_top *ktop, int type)
 			}
 		}
 	}
+	rcu_read_unlock();
 	sort_cputime_by_pid(ktop->curr_proc_delta, ktop->curr_proc_pid, pid_cnt, ktop->top_loading_pid);
 
 	
@@ -585,6 +591,7 @@ static void htc_kernel_top_cal(struct _htc_kernel_top *ktop, int type)
 #endif
 	}
 
+	rcu_read_lock();
 	
 	for_each_process(process) {
 		if (process->pid < MAX_PID) {
@@ -592,6 +599,7 @@ static void htc_kernel_top_cal(struct _htc_kernel_top *ktop, int type)
 			ktop->prev_proc_stat[process->pid] = cputime.stime + cputime.utime;
 		}
 	}
+	rcu_read_unlock();
 	memcpy(&ktop->prev_cpustat, &ktop->curr_cpustat, sizeof(struct kernel_cpustat));
 	spin_unlock_irqrestore(&ktop->lock, flags);
 }
@@ -601,10 +609,10 @@ static void htc_kernel_top_show(struct _htc_kernel_top *ktop, int type)
 	int top_n_pid = 0, i;
 
 	
-	pr_debug("[K]%sCPU Usage\t\tPID\t\tName\n", type == KERNEL_TOP_ACCU ? "[KTOP]" : " ");
+	pr_info("[K]%sCPU Usage\t\tPID\t\tName\n", type == KERNEL_TOP_ACCU ? "[KTOP]" : " ");
 	for (i = 0; i < NUM_BUSY_THREAD_CHECK; i++) {
 		top_n_pid = ktop->top_loading_pid[i];
-		pr_debug("[K]%s%8lu%%\t\t%d\t\t%s\t\t%d\n", type == KERNEL_TOP_ACCU ? "[KTOP]" : " ",
+		pr_info("[K]%s%8lu%%\t\t%d\t\t%s\t\t%d\n", type == KERNEL_TOP_ACCU ? "[KTOP]" : " ",
 			ktop->curr_proc_delta[top_n_pid] * 100 / ktop->cpustat_time,
 			top_n_pid,
 			ktop->task_ptr_array[top_n_pid]->comm,
@@ -615,21 +623,48 @@ static void htc_kernel_top_show(struct _htc_kernel_top *ktop, int type)
 	memset(ktop->curr_proc_pid, 0, sizeof(int) * MAX_PID);
 }
 
+static unsigned int  get_td_sf(void)
+{
+	char *p;
+	unsigned int td_sf = 0;
+	size_t cmdline_len, sf_len;
+
+	if (NULL == saved_command_line)
+	{
+		return 0;
+	}
+
+	cmdline_len = strlen(saved_command_line);
+	sf_len = strlen("td.sf=");
+
+	for (p = saved_command_line; p < saved_command_line + cmdline_len - sf_len; p++) {
+		if (!strncmp(p, "td.sf=", sf_len)) {
+			p += sf_len;
+			if (*p != '0')
+				td_sf = 1;
+			pr_debug("[K] S-ON found td_sf:%d\n", td_sf);
+			break;
+		}
+	}
+
+	return td_sf;
+}
+
 static void htc_pm_monitor_work_func(struct work_struct *work)
 {
-        struct _htc_kernel_top *ktop = container_of(work, struct _htc_kernel_top,
+	struct _htc_kernel_top *ktop = container_of(work, struct _htc_kernel_top,
 		                        dwork.work);
 	struct timespec ts;
 	struct rtc_time tm;
 
 	if (!htc_pm_monitor_wq) {
-		pr_debug("[K] htc_pm_monitor_wq is unavaliable.\n");
+		pr_info("[K] htc_pm_monitor_wq is unavaliable.\n");
 		return;
 	}
 
 	getnstimeofday(&ts);
 	rtc_time_to_tm(ts.tv_sec - (sys_tz.tz_minuteswest * 60), &tm);
-	pr_debug("[K][PM] hTC PM Statistic start (%02d-%02d %02d:%02d:%02d)\n",
+	pr_info("[K][PM] hTC PM Statistic start (%02d-%02d %02d:%02d:%02d)\n",
 		tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 	
@@ -647,13 +682,20 @@ static void htc_pm_monitor_work_func(struct work_struct *work)
 	
 	htc_print_active_wakeup_sources();
 
-	queue_delayed_work(htc_pm_monitor_wq, &ktop->dwork, msecs_to_jiffies(msm_htc_util_delay_time));
+	if (saved_kernel_flag){
+			queue_delayed_work(htc_pm_monitor_wq, &ktop->dwork, msecs_to_jiffies(MSM_HTC_UTIL_DELAY_TIME_S_ON));
+	}
+	else{
+			queue_delayed_work(htc_pm_monitor_wq, &ktop->dwork, msecs_to_jiffies(msm_htc_util_delay_time));
+	}
+	
+
 	htc_kernel_top_cal(ktop, KERNEL_TOP);
 	htc_kernel_top_show(ktop, KERNEL_TOP);
 
 	
 	htc_debug_flag_show();
-	pr_debug("[K][PM] hTC PM Statistic done\n");
+	pr_info("[K][PM] hTC PM Statistic done\n");
 }
 
 static void htc_kernel_top_accumulation_monitor_work_func(struct work_struct *work)
@@ -701,7 +743,7 @@ void htc_monitor_init(void)
 		if (!htc_pm_monitor_wq)
 			return;
 
-		pr_debug("[K] Success to create htc_pm_monitor_wq (0x%x).\n",
+		pr_info("[K] Success to create htc_pm_monitor_wq (0x%x).\n",
 						(unsigned int) htc_pm_monitor_wq);
 		htc_kernel_top = vmalloc(sizeof(*htc_kernel_top));
 		spin_lock_init(&htc_kernel_top->lock);
@@ -720,6 +762,9 @@ void htc_monitor_init(void)
 	        get_all_cpustat(&htc_kernel_top->prev_cpustat);
 
 		INIT_DELAYED_WORK(&htc_kernel_top->dwork, htc_pm_monitor_work_func);
+
+		saved_kernel_flag = get_td_sf();
+
 		queue_delayed_work(htc_pm_monitor_wq, &htc_kernel_top->dwork,
 						msecs_to_jiffies(msm_htc_util_delay_time));
 	}

@@ -16,14 +16,12 @@
 #define PANEL_ID_M8_LG_NT35695		5
 #define PANEL_ID_M8_LG_NT35595		6
 
-/* HTC: dsi_power_data overwrite the role of dsi_drv_cm_data
-   in mdss_dsi_ctrl_pdata structure */
 struct dsi_power_data {
-	uint32_t sysrev;         /* system revision info */
-	struct regulator *vddio; /* 1.8v */
-	struct regulator *vdda;  /* 1.2v */
+	uint32_t sysrev;         
+	struct regulator *vddio; 
+	struct regulator *vdda;  
 
-	struct regulator *vlcmio; /* 1.8v */
+	struct regulator *vlcmio; 
 	int lcmio;
 	int lcmp5v;
 	int lcmn5v;
@@ -97,7 +95,7 @@ static int tps_65132_add_i2c(struct i2c_client *client)
 	struct i2c_adapter *adapter = client->adapter;
 	int idx;
 
-	/* "Hotplug" the MHL transmitter device onto the 2nd I2C bus  for BB-xM or 4th for pandaboard*/
+	
 	i2c_bus_adapter = adapter;
 	if (i2c_bus_adapter == NULL) {
 		PR_DISP_ERR("%s() failed to get i2c adapter\n", __func__);
@@ -250,9 +248,7 @@ static int htc_m8_regulator_init(struct platform_device *pdev)
 
 static int htc_m8_regulator_deinit(struct platform_device *pdev)
 {
-	/* devm_regulator() will automatically free regulators
-	   while dev detach. */
-	/* nothing */
+	
 	return 0;
 }
 
@@ -369,7 +365,7 @@ static int htc_m8_panel_power_on(struct mdss_panel_data *pdata, int enable)
 
 	if (enable) {
 		if (gpio_is_valid(pwrdata->lcmio)) {
-			/* EVM */
+			
 			gpio_set_value(pwrdata->lcmio, 1);
 		} else {
 			ret = regulator_enable(pwrdata->vlcmio);
@@ -384,7 +380,7 @@ static int htc_m8_panel_power_on(struct mdss_panel_data *pdata, int enable)
 		gpio_set_value(pwrdata->lcmp5v, 1);
 
 		if (htc_m8_lg_panel_check(pdata->panel_info.panel_id)){
-			u8 avdd_level = 0x11; //set to +-5.7V
+			u8 avdd_level = 0x11; 
 			platform_write_i2c_block(i2c_bus_adapter,0x7C,0x00, 0x01, &avdd_level);
 			platform_write_i2c_block(i2c_bus_adapter,0x7C,0x01, 0x01, &avdd_level);
 		}
@@ -473,7 +469,7 @@ static int htc_m8_panel_power_on(struct mdss_panel_data *pdata, int enable)
 				return ret;
 			}
 		}
-		/* Delay 20ms to avoid panel issue when fast power on\off */
+		
 		usleep_range(20000,20500);
 	}
 	PR_DISP_INFO("%s: en=%d done\n", __func__, enable);

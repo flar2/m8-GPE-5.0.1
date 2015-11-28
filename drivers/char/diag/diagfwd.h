@@ -57,6 +57,7 @@ void diag_ws_on_copy(void);
 void diag_ws_on_copy_complete(void);
 void diag_ws_reset(void);
 void diag_smd_queue_read(struct diag_smd_info *smd_info);
+/* State for diag forwarding */
 #ifdef CONFIG_DIAG_OVER_USB
 int diagfwd_connect(void);
 int diagfwd_disconnect(void);

@@ -48,6 +48,7 @@ struct dwc3_msm {
         struct delayed_work     resume_work;
         struct work_struct      restart_usb_work;
         struct work_struct      usb_block_reset_work;
+        bool                    in_restart;
         struct dwc3_charger     charger;
         struct usb_phy          *otg_xceiv;
         struct delayed_work     chg_work;

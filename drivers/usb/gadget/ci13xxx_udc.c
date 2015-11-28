@@ -3092,8 +3092,8 @@ static irqreturn_t udc_irq(void)
 			if (udc->gadget.ats_reset_irq_count == 50) {
 				udc->gadget.ats_reset_irq_count++;
 				if (udc->driver->broadcast_abnormal_usb_reset) {
-							printk(KERN_INFO "[USB] gadget irq :abnormal the amount of reset irq!\n");
-							
+					printk(KERN_INFO "[USB] gadget irq :abnormal the amount of reset irq!\n");
+					udc->driver->broadcast_abnormal_usb_reset();
 				}
 			} else if (udc->gadget.ats_reset_irq_count < 50)
 				udc->gadget.ats_reset_irq_count++;

@@ -288,13 +288,13 @@ static int hs_pmic_adc_to_keycode(int adc)
 
 	if (adc >= hi->pdata.adc_remote[0] &&
 	    adc <= hi->pdata.adc_remote[1])
-		key_code = HS_MGR_KEY_PLAY;
+		key_code = HS_MGR_KEY1;
 	else if (adc >= hi->pdata.adc_remote[2] &&
 		 adc <= hi->pdata.adc_remote[3])
-		key_code = HS_MGR_KEY_BACKWARD;
+		key_code = HS_MGR_KEY2;
 	else if (adc >= hi->pdata.adc_remote[4] &&
 		 adc <= hi->pdata.adc_remote[5])
-		key_code = HS_MGR_KEY_FORWARD;
+		key_code = HS_MGR_KEY3;
 	else if (adc > hi->pdata.adc_remote[5])
 		key_code = HS_MGR_KEY_NONE;
 

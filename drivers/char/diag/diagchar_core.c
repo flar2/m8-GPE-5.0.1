@@ -436,10 +436,12 @@ static int diagchar_close(struct inode *inode, struct file *file)
 #ifdef CONFIG_DIAG_OVER_USB
 	
 	if (driver->logging_process_id == current->tgid) {
+		mutex_lock(&driver->diagchar_mutex);
 		driver->logging_mode = USB_MODE;
+		diag_ws_reset();
+		mutex_unlock(&driver->diagchar_mutex);
 		diag_update_proc_vote(DIAG_PROC_MEMORY_DEVICE, VOTE_DOWN);
 		diagfwd_connect();
-		diag_ws_reset();
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
 		diag_clear_hsic_tbl();
 		diagfwd_cancel_hsic(REOPEN_HSIC);
@@ -1056,6 +1058,7 @@ int diag_switch_logging(unsigned long ioarg)
 				pr_err("socket process, status: %d\n",
 					status);
 			}
+			driver->socket_process = NULL;
 		}
 	} else if (driver->logging_mode == SOCKET_MODE) {
 		driver->socket_process = current;
@@ -1440,9 +1443,15 @@ drop:
 					COPY_USER_SPACE_OR_EXIT(buf+ret,
 						*(data->buf_in_1),
 						data->write_ptr_1->length);
+					diag_ws_on_copy();
+					copy_data = 1;
 					data->in_busy_1 = 0;
 				}
 			}
+		}
+		if (!copy_data) {
+			diag_ws_on_copy();
+			copy_data = 1;
 		}
 #ifdef CONFIG_DIAG_SDIO_PIPE
 		
@@ -1855,10 +1864,10 @@ dropd:
 exit:
 	mutex_unlock(&driver->diagchar_mutex);
 	if (copy_data) {
+		diag_ws_on_copy_complete();
 		for (i = 0; i < NUM_SMD_DATA_CHANNELS; i++)
 			flush_workqueue(driver->smd_data[i].wq);
 		wake_up(&driver->smd_wait_q);
-		diag_ws_on_copy_complete();
 	}
 	return ret;
 }
@@ -2492,7 +2501,7 @@ static int diagchar_setup_cdev(dev_t devno)
 		return -1;
 	}
 
-	driver->diagchar_class = class_create(THIS_MODULE, "htc_diag");
+	driver->diagchar_class = class_create(THIS_MODULE, "diag");
 
 	if (IS_ERR(driver->diagchar_class)) {
 		printk(KERN_ERR "Error creating diagchar class.\n");
@@ -2500,7 +2509,7 @@ static int diagchar_setup_cdev(dev_t devno)
 	}
 
 	driver->diag_dev = device_create(driver->diagchar_class, NULL, devno,
-				  (void *)driver, "htc_diag");
+				  (void *)driver, "diag");
 
 	if (!driver->diag_dev)
 		return -EIO;
@@ -2674,7 +2683,7 @@ static int __init diagchar_init(void)
 #endif
 #endif
 		driver->name = ((void *)driver) + sizeof(struct diagchar_dev);
-		strlcpy(driver->name, "htc_diag", 4);
+		strlcpy(driver->name, "diag", 4);
 #if DIAG_XPST
 		driver->debug_dmbytes_recv = 0;
 #endif

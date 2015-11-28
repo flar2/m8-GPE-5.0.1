@@ -24,9 +24,18 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/mm.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 
 #define PROCNAME "driver/hdf"
 #define FLAG_LEN 64
+#define HTC_DEBUG_HDF_DEV_NAME "htc,htc_debug_hdf"
+
+static struct of_device_id htc_debug_hdf_match_table[] = {
+    { .compatible = HTC_DEBUG_HDF_DEV_NAME },
+    {}
+};
+
 static char htc_debug_flag[FLAG_LEN+1];
 extern int get_partition_num_by_name(char *name);
 static int offset=628;
@@ -169,6 +178,48 @@ int htc_debug_write(struct file *file, const char *buffer, unsigned long count, 
     return count;
 }
 
+static int htc_debug_parse_tbl(struct device *dev, char *prop)
+{
+    int ret, prop_len;
+    char *data = NULL;
+
+    if (!of_find_property(dev->of_node, prop, &prop_len))
+        return -EINVAL;
+
+    pr_info("%s - length: %d\n", __func__, prop_len);
+    if(prop_len < FLAG_LEN)
+        return -EINVAL;
+
+    ret = of_property_read_string(dev->of_node, prop, (const char **)&data);
+    pr_info("%s - loglevel: %s\n", __func__, data);
+
+    memset(htc_debug_flag, 0, (FLAG_LEN + 1));
+    memcpy(htc_debug_flag, data, FLAG_LEN);
+
+    
+    first_read = 0;
+    return prop_len;
+}
+
+static int htc_debug_probe(struct platform_device *pdev)
+{
+    struct device *dev = &pdev->dev;
+    pr_info("%s\n", __func__);
+
+    htc_debug_parse_tbl(dev, "htc,loglevel");
+    return 0;
+}
+
+static struct platform_driver htc_debug_driver =
+{
+    .probe = htc_debug_probe,
+    .driver = {
+        .name = HTC_DEBUG_HDF_DEV_NAME,
+        .owner = THIS_MODULE,
+        .of_match_table = htc_debug_hdf_match_table,
+    },
+};
+
 static int __init htc_debug_init(void)
 {
     struct proc_dir_entry *entry;
@@ -181,6 +232,8 @@ static int __init htc_debug_init(void)
 
     entry->read_proc = htc_debug_read;
     entry->write_proc = htc_debug_write;
+
+    platform_driver_register(&htc_debug_driver);
 
     return 0;
 }

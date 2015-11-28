@@ -26,6 +26,7 @@
 #include "ilp0100_ST_api.h"
 #include "ilp0100_customer_sensor_config.h"
 #endif
+
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_info("[CAM] : " fmt, ##args)
@@ -353,7 +354,7 @@ static int32_t msm_sensor_get_dt_vreg_data(struct device_node *of_node,
 			sensordata->cam_vreg[i].op_mode);
 	}
 
-#ifndef CONFIG_MACH_DUMMY
+#ifndef CONFIG_MACH_A11_UL
 	rc = of_property_read_u32_array(of_node, "qcom,cam-vreg-gpios-index",
 		vreg_array, count);
 	if (rc < 0) {
@@ -1961,7 +1962,8 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			break;
 		}
 
-		if (!conf_array.size) {
+		if ((!conf_array.size) ||
+			(conf_array.size > I2C_USER_REG_DATA_MAX )) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -2141,7 +2143,8 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			break;
 		}
 
-		if (!conf_array.size) {
+		if ((!conf_array.size) ||
+			(conf_array.size > I2C_USER_REG_DATA_MAX )) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;

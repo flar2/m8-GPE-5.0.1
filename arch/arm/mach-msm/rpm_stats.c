@@ -250,6 +250,9 @@ static inline int msm_rpmstats_copy_stats_v3(
 	return length;
 }
 
+/* HTC_WIFI_START
+ * 20140519 Cooper, monitor the stick time of aCPU and wlanFW.
+ */
 #ifdef CONFIG_HTC_MONITOR_SUBSYS_SLEEP_TIME
 
 struct trackStick {
@@ -280,6 +283,12 @@ void rpm_resetSubsysStickTime(int n)
 }
 EXPORT_SYMBOL(rpm_resetSubsysStickTime);
 
+/**
+ * HTC_WIFI_START20140519 Cooper
+ * When CONFIG_HTC_POWER_DEBUG=n, monitor aCPU/wlanFW by WLAN driver itself.
+ * @i: Subsystem number
+ * Returns: sleep time of sub-system, -1 on failure
+ */
 int rpm_getSubsysStickTime(int n, struct timeval *cur_t)
 {
 	void __iomem *reg;
@@ -336,7 +345,8 @@ int rpm_getSubsysStickTime(int n, struct timeval *cur_t)
 	return ret;
 }
 EXPORT_SYMBOL(rpm_getSubsysStickTime);
-#endif 
+#endif //END of CONFIG_HTC_MONITOR_SUBSYS_SLEEP_TIME
+/* HTC_WIFI_END */
 
 void msm_rpm_dump_stat(void)
 {
@@ -347,7 +357,7 @@ void msm_rpm_dump_stat(void)
 
 	if (rpm_stats_dev[DEV_V2].init) {
 		reg = rpm_stats_dev[DEV_V2].reg_base;
-		pr_debug("%s: %u, %llums, %u, %llums\n", __func__,
+		pr_info("%s: %u, %llums, %u, %llums\n", __func__,
 			msm_rpmstats_read_long_register_v2(reg, 0, offsetof(struct msm_rpm_stats_data_v2, count)),
 			get_time_in_msec(msm_rpmstats_read_quad_register_v2(reg, 0,
 							offsetof(struct msm_rpm_stats_data_v2, accumulated))),
@@ -371,7 +381,7 @@ void msm_rpm_dump_stat(void)
 			if (data_v3.is_sleep_mode)
 				data_v3.total_duration += (arch_counter_get_cntpct() - data_v3.sleep_timestamp);
 
-			pr_debug("[K] sleep_info_m.%d - %u (%d), %llums\n", i, data_v3.count,
+			pr_info("[K] sleep_info_m.%d - %u (%d), %llums\n", i, data_v3.count,
 									data_v3.is_sleep_mode,
 									get_time_in_msec(data_v3.total_duration));
 		}
@@ -677,10 +687,12 @@ static int __init msm_rpmstats_init(void)
 	memset(rpm_stats_dev, 0, sizeof(struct msm_rpm_stats_data)*DEV_MAX);
 #endif
 
+/* HTC_WIFI_START 20140519 Cooper */
 #ifdef CONFIG_HTC_MONITOR_SUBSYS_SLEEP_TIME
 	memset(&aCPU, 0, sizeof(struct trackStick));
 	memset(&wlanFW, 0, sizeof(struct trackStick));
 #endif
+/* HTC_WIFI_END */
 
 	return platform_driver_register(&msm_rpmstats_driver);
 }

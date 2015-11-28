@@ -81,10 +81,10 @@
 		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
 		qcom,mdss-pan-physical-width-dimension = <53>;
 		qcom,mdss-pan-physical-height-dimension = <94>;
-		qcom,mdss-shrink-pwm = <12 79 255>;
 		/*qcom,mdss-dsi-lp11-init;*/
 		htc,mdss-camera-blk = <185>;
 		htc,panel-id=<0>;
+		htc,brt-bl-table = <30 12>, <142 79>, <255 255>;
 	};
 
 	qcom,mdss_dsi_mem_lg_novatek_35521_720p_video {
@@ -312,7 +312,6 @@
 		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
 		qcom,mdss-pan-physical-width-dimension = <55>;
 		qcom,mdss-pan-physical-height-dimension = <98>;
-		qcom,mdss-shrink-pwm = <6 88 255>;
 		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
 		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
 		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
@@ -320,6 +319,7 @@
 		htc,mdss-camera-blk = <189>;
 		htc,skip-frame;
 		htc,panel-id=<1>;
+		htc,brt-bl-table = <30 6>, <142 88>, <255 255>;
 	};
 
 	qcom,mdss_dsi_mem_lg_novatek_35521_720p_video_mockup {
@@ -539,13 +539,13 @@
 		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
 		qcom,mdss-pan-physical-width-dimension = <55>;
 		qcom,mdss-pan-physical-height-dimension = <98>;
-		qcom,mdss-shrink-pwm = <13 88 255>;
 		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
 		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
 		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
 		/*qcom,mdss-dsi-lp11-init;*/
 		htc,mdss-camera-blk = <189>;
 		htc,panel-id=<1>;
+		htc,brt-bl-table = <30 13>, <142 88>, <255 255>;
 	};
 
 };

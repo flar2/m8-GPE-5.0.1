@@ -15,7 +15,7 @@
 #define DUAL_CAL_OTP_SIZE 1024
 static uint8_t otp[20];
 static uint8_t otp_mem[DUAL_CAL_OTP_SIZE];
-static uint8_t *path= "/data/OTPData.dat";
+static uint8_t *path= "/data/misc/camera/OTPData.dat";
 DEFINE_MSM_MUTEX(imx214_800m_fov77_mut);
 
 static struct msm_sensor_ctrl_t imx214_800m_fov77_s_ctrl;

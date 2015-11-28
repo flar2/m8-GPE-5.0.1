@@ -909,6 +909,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_send_relative_addr(host, &card->rca);
 		if (err)
 			return err;
+		host->card = card;
 	}
 
 	if (!oldcard) {
@@ -968,12 +969,13 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		card->sw_caps.uhs_max_dtr ?
 			card->sw_caps.uhs_max_dtr : card->sw_caps.hs_max_dtr);
 
-	host->card = card;
 	return 0;
 
 free_card:
-	if (!oldcard)
+	if (!oldcard) {
+		host->card = NULL;
 		mmc_remove_card(card);
+	}
 
 	return err;
 }
@@ -1067,7 +1069,7 @@ static int mmc_sd_suspend(struct mmc_host *host)
 
 static int mmc_sd_resume(struct mmc_host *host)
 {
-	int err = 0;
+	int err;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	int retries;
 	int delayTime;

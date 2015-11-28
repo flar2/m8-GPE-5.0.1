@@ -676,7 +676,7 @@ out:
 
 static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
-	struct inode *inode = filp->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(filp);
 	return __fat_readdir(inode, filp, dirent, filldir, 0, 0);
 }
 
@@ -764,7 +764,7 @@ static int fat_ioctl_volume_id(struct inode *dir)
 static long fat_dir_ioctl(struct file *filp, unsigned int cmd,
 			  unsigned long arg)
 {
-	struct inode *inode = filp->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(filp);
 	struct __fat_dirent __user *d1 = (struct __fat_dirent __user *)arg;
 	int short_only, both;
 
@@ -806,7 +806,7 @@ FAT_IOCTL_FILLDIR_FUNC(fat_compat_ioctl_filldir, compat_dirent)
 static long fat_compat_dir_ioctl(struct file *filp, unsigned cmd,
 				 unsigned long arg)
 {
-	struct inode *inode = filp->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(filp);
 	struct compat_dirent __user *d1 = compat_ptr(arg);
 	int short_only, both;
 
@@ -887,7 +887,7 @@ EXPORT_SYMBOL_GPL(fat_get_dotdot_entry);
 int fat_dir_empty(struct inode *dir)
 {
 	struct buffer_head *bh;
-	struct msdos_dir_entry *de = NULL;
+	struct msdos_dir_entry *de;
 	loff_t cpos;
 	int result = 0;
 
@@ -913,7 +913,7 @@ EXPORT_SYMBOL_GPL(fat_dir_empty);
 int fat_subdirs(struct inode *dir)
 {
 	struct buffer_head *bh;
-	struct msdos_dir_entry *de = NULL;
+	struct msdos_dir_entry *de;
 	loff_t cpos;
 	int count = 0;
 

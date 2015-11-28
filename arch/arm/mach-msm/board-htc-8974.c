@@ -86,11 +86,6 @@
 #include <linux/android_ediagpmem.h>
 #endif
 
-#ifdef CONFIG_KEXEC_HARDBOOT
-#include <linux/memblock.h>
-#include <asm/setup.h>
-#endif
-
 #if defined(CONFIG_FB_MSM_MDSS_HDMI_MHL_SII8240_SII8558) && defined(CONFIG_HTC_MHL_DETECTION)
 #include "../../../drivers/video/msm/mdss/sii8240_8558/mhl_platform.h"
 #endif
@@ -103,7 +98,7 @@ static int mhl_usb_sw_gpio;
 
 #define HTC_8974_PERSISTENT_RAM_PHYS 0x05B00000
 #ifdef CONFIG_HTC_BUILD_EDIAG
-#define HTC_8974_PERSISTENT_RAM_SIZE (SZ_1M - SZ_128K - SZ_64K)
+#define HTC_8974_PERSISTENT_RAM_SIZE (SZ_1M - SZ_128K - SZ_64K - SZ_64K)
 #else
 #define HTC_8974_PERSISTENT_RAM_SIZE (SZ_1M - SZ_128K)
 #endif
@@ -124,8 +119,8 @@ static struct persistent_ram htc_8974_persistent_ram = {
 };
 
 #ifdef CONFIG_HTC_BUILD_EDIAG
-#define MSM_HTC_PMEM_EDIAG_BASE 0x05BD0000
-#define MSM_HTC_PMEM_EDIAG_SIZE SZ_64K
+#define MSM_HTC_PMEM_EDIAG_BASE 0x05BC0000
+#define MSM_HTC_PMEM_EDIAG_SIZE (SZ_128K)
 #define MSM_HTC_PMEM_EDIAG1_BASE MSM_HTC_PMEM_EDIAG_BASE
 #define MSM_HTC_PMEM_EDIAG1_SIZE MSM_HTC_PMEM_EDIAG_SIZE
 #define MSM_HTC_PMEM_EDIAG2_BASE MSM_HTC_PMEM_EDIAG_BASE
@@ -494,6 +489,8 @@ static void htc_8974_add_usb_devices(void)
 	android_usb_pdata.product_id	= 0x063B;
 #elif defined(CONFIG_MACH_DUMMY)
 	android_usb_pdata.product_id	= 0x0643;
+#elif defined(CONFIG_MACH_M8_UHL)
+	android_usb_pdata.product_id	= 0x063A;
 #elif defined(CONFIG_MACH_DUMMY)
 	android_usb_pdata.product_id	= 0x0635;
 #elif defined(CONFIG_MACH_DUMMY)
@@ -523,7 +520,7 @@ static void htc_8974_add_usb_devices(void)
 
 	platform_device_register(&android_usb_device);
 }
-#if 0
+#if (defined(CONFIG_MACH_GLU_U) || defined(CONFIG_MACH_GLU_WLJ))
 static ssize_t syn_vkeys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
@@ -644,6 +641,7 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.icharger.set_pwrsrc_enable = pm8941_pwrsrc_enable,
 	.icharger.set_pwrsrc_and_charger_enable =
 						pm8941_set_pwrsrc_and_charger_enable,
+	.icharger.cable_irq_count = pm8941_cable_irq_count,
 	.icharger.set_limit_charge_enable = pm8941_limit_charge_enable,
 	.icharger.set_limit_input_current = pm8941_limit_input_current,
 	.icharger.set_chg_iusbmax = pm8941_set_chg_iusbmax,
@@ -741,7 +739,7 @@ void __init htc_8974_add_drivers(void)
 	htc_batt_cell_register();
 	msm8974_add_batt_devices();
 #endif 
-#if 0
+#if (defined(CONFIG_MACH_GLU_U) || defined(CONFIG_MACH_GLU_WLJ))
 	syn_init_vkeys_8974();
 #endif
 	htc_8974_cable_detect_register();
@@ -810,26 +808,7 @@ static void __init htc_8974_map_io(void)
 
 void __init htc_8974_init_early(void)
 {
-#ifdef CONFIG_KEXEC_HARDBOOT
-	// Reserve space for hardboot page - just after ram_console,
-	// at the start of second memory bank
-	int ret;
-	phys_addr_t start;
-	struct membank* bank;
-
-	if (meminfo.nr_banks < 2) {
-		pr_err("%s: not enough membank\n", __func__);
-		return;
-	}
-
-	bank = &meminfo.bank[1];
-	start = bank->start + SZ_1M + HTC_8974_PERSISTENT_RAM_SIZE;
-	ret = memblock_remove(start, SZ_1M);
-	if(!ret)
-		pr_info("Hardboot page reserved at 0x%X\n", start);
-	else
-		pr_err("Failed to reserve space for hardboot page at 0x%X!\n", start);
-#endif	
+	
 	persistent_ram_early_init(&htc_8974_persistent_ram);
 
 #ifdef CONFIG_HTC_DEBUG_FOOTPRINT

@@ -1,12 +1,3 @@
-/*
- * Common LSM logging functions
- * Heavily borrowed from selinux/avc.h
- *
- * Author : Etienne BASSET  <etienne.basset@ensta.org>
- *
- * All credits to : Stephen Smalley, <sds@epoch.ncsc.mil>
- * All BUGS to : Etienne BASSET  <etienne.basset@ensta.org>
- */
 #ifndef _LSM_COMMON_LOGGING_
 #define _LSM_COMMON_LOGGING_
 
@@ -40,7 +31,11 @@ struct lsm_network_audit {
 	} fam;
 };
 
-/* Auxiliary data to use in generating the audit record. */
+struct lsm_ioctlop_audit {
+	struct path path;
+	u16 cmd;
+};
+
 struct common_audit_data {
 	char type;
 #define LSM_AUDIT_DATA_PATH	1
@@ -53,6 +48,7 @@ struct common_audit_data {
 #define LSM_AUDIT_DATA_KMOD	8
 #define LSM_AUDIT_DATA_INODE	9
 #define LSM_AUDIT_DATA_DENTRY	10
+#define LSM_AUDIT_DATA_IOCTL_OP	11
 	struct task_struct *tsk;
 	union 	{
 		struct path path;
@@ -69,8 +65,9 @@ struct common_audit_data {
 		} key_struct;
 #endif
 		char *kmod_name;
+		struct lsm_ioctlop_audit *op;
 	} u;
-	/* this union contains LSM specific data */
+	
 	union {
 #ifdef CONFIG_SECURITY_SMACK
 		struct smack_audit_data *smack_audit_data;
@@ -81,7 +78,7 @@ struct common_audit_data {
 #ifdef CONFIG_SECURITY_APPARMOR
 		struct apparmor_audit_data *apparmor_audit_data;
 #endif
-	}; /* per LSM data pointer union */
+	}; 
 };
 
 #define v4info fam.v4
@@ -92,11 +89,6 @@ int ipv4_skb_to_auditdata(struct sk_buff *skb,
 
 int ipv6_skb_to_auditdata(struct sk_buff *skb,
 		struct common_audit_data *ad, u8 *proto);
-
-/* Initialize an LSM audit data structure. */
-#define COMMON_AUDIT_DATA_INIT(_d, _t) \
-	{ memset((_d), 0, sizeof(struct common_audit_data)); \
-	 (_d)->type = LSM_AUDIT_DATA_##_t; }
 
 void common_lsm_audit(struct common_audit_data *a,
 	void (*pre_audit)(struct audit_buffer *, void *),

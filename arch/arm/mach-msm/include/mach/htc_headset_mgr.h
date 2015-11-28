@@ -238,9 +238,9 @@ enum {
 enum {
 	HS_MGR_KEY_INVALID	= -1,
 	HS_MGR_KEY_NONE		= 0,
-	HS_MGR_KEY_PLAY		= 1,
-	HS_MGR_KEY_BACKWARD	= 2,
-	HS_MGR_KEY_FORWARD	= 3,
+	HS_MGR_KEY1		= 1,
+	HS_MGR_KEY2		= 2,
+	HS_MGR_KEY3		= 3,
 };
 
 enum {

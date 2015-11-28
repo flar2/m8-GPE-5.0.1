@@ -170,7 +170,7 @@ static int ion_user_to_kernel(struct smem_client *client, int fd, u32 offset,
 		"%s: ion_handle = 0x%p, fd = %d, device_addr = 0x%x, size = %d, kvaddr = 0x%p, buffer_type = %d\n",
 		__func__, mem->smem_priv, fd, (u32)mem->device_addr,
 		mem->size, mem->kvaddr, mem->buffer_type);
-	
+	/* HTC_START: Print ION alloc/import/free logs to debug ION memory leak on kernel space */
 	switch (mem->buffer_type) {
 	case HAL_BUFFER_INPUT:
 		dprintk(VIDC_WARN,
@@ -189,7 +189,7 @@ static int ion_user_to_kernel(struct smem_client *client, int fd, u32 offset,
 			client->inst, hndl->buffer, mem->size, fd);
 		break;
 	}
-	
+	/* HTC_END */
 	return rc;
 fail_device_address:
 	ion_free(client->clnt, hndl);
@@ -263,7 +263,7 @@ static int alloc_ion_mem(struct smem_client *client, size_t size, u32 align,
 		"%s: ion_handle = 0x%p, device_addr = 0x%x, size = %d, kvaddr = 0x%p, buffer_type = %d\n",
 		__func__, mem->smem_priv, (u32)mem->device_addr,
 		mem->size, mem->kvaddr, mem->buffer_type);
-	
+	/* HTC_START: Print ION alloc/import/free logs to debug ION memory leak on kernel space */
 	switch (mem->buffer_type) {
 	case HAL_BUFFER_INTERNAL_SCRATCH:
 	case HAL_BUFFER_INTERNAL_SCRATCH_1:
@@ -283,7 +283,7 @@ static int alloc_ion_mem(struct smem_client *client, size_t size, u32 align,
 			client->inst, hndl->buffer, size);
 		break;
 	}
-	
+	/* HTC_END */
 	return rc;
 fail_device_address:
 	ion_unmap_kernel(client->clnt, hndl);
@@ -296,7 +296,7 @@ fail_shared_mem_alloc:
 static void free_ion_mem(struct smem_client *client, struct msm_smem *mem)
 {
 	int domain, partition, rc;
-	
+	/* HTC_START: Print ION alloc/import/free logs to debug ION memory leak on kernel space */
 	struct ion_handle *hndl = mem->smem_priv;
 
 	switch (mem->buffer_type) {
@@ -329,7 +329,7 @@ static void free_ion_mem(struct smem_client *client, struct msm_smem *mem)
 			client->inst, hndl->buffer, mem->size);
 		break;
 	}
-	
+	/* HTC_END */
 
 	dprintk(VIDC_DBG,
 		"%s: ion_handle = 0x%p, device_addr = 0x%x, size = %d, kvaddr = 0x%p, buffer_type = %d\n",
@@ -552,7 +552,7 @@ void msm_smem_free(void *clt, struct msm_smem *mem)
 	}
 	switch (client->mem_type) {
 	case SMEM_ION:
-		
+		/* HTC_START: Switch ion_client for releasing scratch buffer */
 		if ((mem->buffer_type == HAL_BUFFER_INTERNAL_SCRATCH) ||
 			(mem->buffer_type == HAL_BUFFER_INTERNAL_SCRATCH_1) ||
 			(mem->buffer_type == HAL_BUFFER_INTERNAL_SCRATCH_2)) {
@@ -564,7 +564,7 @@ void msm_smem_free(void *clt, struct msm_smem *mem)
 			(mem->buffer_type == HAL_BUFFER_INTERNAL_SCRATCH_2)) {
 			client->clnt = client->clnt_import;
 		}
-		
+		/* HTC_END */
 		break;
 	default:
 		dprintk(VIDC_ERR, "Mem type not supported\n");

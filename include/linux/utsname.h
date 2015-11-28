@@ -52,6 +52,7 @@ struct uts_namespace {
 	struct kref kref;
 	struct new_utsname name;
 	struct user_namespace *user_ns;
+	unsigned int proc_inum;
 };
 extern struct uts_namespace init_uts_ns;
 
@@ -108,6 +109,6 @@ static inline struct new_utsname *init_utsname(void)
 
 extern struct rw_semaphore uts_sem;
 
-#endif /* __KERNEL__ */
+#endif 
 
-#endif /* _LINUX_UTSNAME_H */
+#endif 

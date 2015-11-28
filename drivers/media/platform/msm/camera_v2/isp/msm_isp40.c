@@ -363,8 +363,9 @@ static void msm_vfe40_process_reset_irq(struct vfe_device *vfe_dev,
 static void msm_vfe40_process_halt_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1)
 {
-	if (irq_status1 & (1 << 8))
-		complete(&vfe_dev->halt_complete);
+    if (irq_status1 & (1 << 8)) {
+        msm_camera_io_w(0x0, vfe_dev->vfe_base + 0x2C0);
+    }
 }
 
 static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,

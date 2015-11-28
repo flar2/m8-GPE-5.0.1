@@ -928,6 +928,17 @@ static void button_35mm_work_func(struct work_struct *work)
 
 	if (hi->key_level_flag) {
 		switch (hi->key_level_flag) {
+#ifdef CONFIG_HTC_HEADSET_L_RMT_KEY_DESIGN
+		case 1:
+			key = HS_MGR_KEYCODE_MEDIA;
+			break;
+		case 2:
+			key = HS_MGR_KEYCODE_VOLUP;
+			break;
+		case 3:
+			key = HS_MGR_KEYCODE_VOLDOWN;
+			break;
+#else
 		case 1:
 			key = HS_MGR_KEYCODE_MEDIA;
 			break;
@@ -937,6 +948,7 @@ static void button_35mm_work_func(struct work_struct *work)
 		case 3:
 			key = HS_MGR_KEYCODE_FORWARD;
 			break;
+#endif
 		default:
 			HS_LOG("3.5mm RC: WRONG Button Pressed");
 			kfree(works);

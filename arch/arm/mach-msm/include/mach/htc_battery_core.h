@@ -23,7 +23,7 @@ struct timespec ts; \
 struct rtc_time tm; \
 getnstimeofday(&ts); \
 rtc_time_to_tm(ts.tv_sec, &tm); \
-printk(KERN_DEBUG "[BATT] " x); \
+printk(KERN_INFO "[BATT] " x); \
 printk(" at %lld (%d-%02d-%02d %02d:%02d:%02d.%09lu UTC)\n", \
 ktime_to_ns(ktime_get()), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, \
 tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec); \
@@ -71,7 +71,7 @@ enum htc_batt_rt_attr {
 	HTC_BATT_RT_CURRENT,
 	HTC_BATT_RT_TEMPERATURE,
 	HTC_BATT_RT_VOLTAGE_UV,
-#if defined(CONFIG_MACH_DUMMY)
+#if defined(CONFIG_MACH_B2_WLJ)
 	HTC_USB_RT_TEMPERATURE,
 #endif
 	HTC_BATT_RT_ID,

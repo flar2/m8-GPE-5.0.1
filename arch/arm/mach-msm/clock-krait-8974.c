@@ -21,7 +21,6 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of.h>
 #include <linux/cpumask.h>
-#include <linux/cpufreq.h>
 
 #include <asm/cputype.h>
 
@@ -40,42 +39,7 @@
 #include <mach/perflock.h>
 #endif
 
-//elementalx
-unsigned long arg_cpu_oc = 0;
-static int arg_vdd_uv = 0;
-int pvs_number = 0;
-module_param(pvs_number, int, 0755); 
-
-static int __init cpufreq_read_cpu_oc(char *cpu_oc)
-{
-	unsigned long ui_khz;
-	int err;
-
-	err =  strict_strtoul(cpu_oc, 0, &ui_khz);
-	if (err)
-		arg_cpu_oc = 0;
-
-	arg_cpu_oc = ui_khz;
-	printk("elementalx: cpu_oc=%lu\n", arg_cpu_oc);
-	return 0;
-}
-__setup("cpu_oc=", cpufreq_read_cpu_oc);
-
-static int __init cpufreq_read_vdd_uv(char *vdd_uv)
-{
-	long arg, err;
-
-	err =  strict_strtol(vdd_uv, 0, &arg);
-	if (err)
-		arg_vdd_uv = 0;
-
-	arg_vdd_uv = arg;
-	printk("elementalx: vdd_uv=%d\n", arg_vdd_uv);
-	return 0;
-}
-__setup("vdd_uv=", cpufreq_read_vdd_uv);
-
-
+/* Clock inputs coming into Krait subsystem */
 DEFINE_FIXED_DIV_CLK(hfpll_src_clk, 1, NULL);
 DEFINE_FIXED_DIV_CLK(acpu_aux_clk, 2, NULL);
 
@@ -197,7 +161,7 @@ DEFINE_KPSS_DIV2_CLK(hfpll_l2_div_clk, &hfpll_l2_clk.c, 0x500, false);
 	.shift = 2,			\
 	MUX_SRC_LIST(			\
 		{&acpu_aux_clk.c, 2},	\
-		{NULL , 0},	\
+		{NULL /* QSB */, 0},	\
 	)
 
 static struct mux_clk krait0_sec_mux_clk = {
@@ -351,6 +315,15 @@ static DEFINE_VDD_REGS_INIT(vdd_krait2, 1);
 static DEFINE_VDD_REGS_INIT(vdd_krait3, 1);
 static DEFINE_VDD_REGS_INIT(vdd_l2, 1);
 
+/*
+ * This clock is mostly a dummy clock in the sense it can't really gate the
+ * CPU/L2 clocks or affect their frequency. It exists solely to:
+ *
+ * - Capture the PVS requirements for each CPU.
+ * - Implement HW clock gating disable ops needed for measuring the freq of
+ *   Krait/L2 properly.
+ * - Implement AVS requirement.
+ */
 static struct kpss_core_clk krait0_clk = {
 	.id	= 0,
 	.avs_tbl = &avs_table,
@@ -494,7 +467,7 @@ static void get_krait_bin_format_b(struct platform_device *pdev,
 	pte_efuse = readl_relaxed(base);
 	redundant_sel = (pte_efuse >> 24) & 0x7;
 	*speed = pte_efuse & 0x7;
-	
+	/* 4 bits of PVS are in efuse register bits 31, 8-6. */
 	*pvs = ((pte_efuse >> 28) & 0x8) | ((pte_efuse >> 6) & 0x7);
 	*pvs_ver = (pte_efuse >> 4) & 0x3;
 
@@ -507,27 +480,17 @@ static void get_krait_bin_format_b(struct platform_device *pdev,
 		break;
 	}
 
+	/* Check SPEED_BIN_BLOW_STATUS */
 	if (pte_efuse & BIT(3)) {
-
-		//elementalx
-		if (arg_cpu_oc == 0 && *speed == 1)
-			arg_cpu_oc = 2265600;
-		else if (arg_cpu_oc == 0 && *speed == 3)
-			arg_cpu_oc = 2457600;
-					
 		dev_info(&pdev->dev, "Speed bin: %d\n", *speed);
 	} else {
 		dev_warn(&pdev->dev, "Speed bin not set. Defaulting to 0!\n");
 		*speed = 0;
 	}
 
-	
+	/* Check PVS_BLOW_STATUS */
 	pte_efuse = readl_relaxed(base + 0x4) & BIT(21);
 	if (pte_efuse) {
-
-		//elementalx
-		pvs_number = *pvs;
-
 		dev_info(&pdev->dev, "PVS bin: %d\n", *pvs);
 	} else {
 		dev_warn(&pdev->dev, "PVS bin not set. Defaulting to 0!\n");
@@ -681,9 +644,9 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 	int i;
 
 	switch (read_cpuid_id()) {
-	case 0x511F04D0: 
-	case 0x511F04D1: 
-	case 0x510F06F0: 
+	case 0x511F04D0: /* KR28M2A20 */
+	case 0x511F04D1: /* KR28M2A21 */
+	case 0x510F06F0: /* KR28M4A10 */
 		for (i = 0; i < num; i++)
 			uv[i] = max(1150000, uv[i]);
 	};
@@ -692,19 +655,6 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 		for (i = 0; i < num; i++)
 			uv[i] += boost_uv;
 	}
-
-	switch (arg_vdd_uv) {
-
-	case 1:
-		uv[1] -= 15000;
-		break;
-	case 2:
-		uv[1] -= 30000;
-		break;
-	case 3:
-		uv[1] -= 45000;
-		break;
-	}
 }
 
 static char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
@@ -712,82 +662,14 @@ module_param_string(table_name, table_name, sizeof(table_name), S_IRUGO);
 static unsigned int pvs_config_ver;
 module_param(pvs_config_ver, uint, S_IRUGO);
 
-#ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
-#define CPU_VDD_MAX	1200
-#define CPU_VDD_MIN	600
-
-extern int use_for_scaling(unsigned int freq);
-static unsigned int cnt;
-
-ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
-			 char *buf)
-{
-	int i, freq, len = 0;
-	unsigned int cpu = 0;
-	unsigned int num_levels = cpu_clk[cpu]->vdd_class->num_levels;
-
-	if (!buf)
-		return -EINVAL;
-
-	for (i = 0; i < num_levels; i++) {
-		freq = use_for_scaling(cpu_clk[cpu]->fmax[i] / 1000);
-		if (freq < 0)
-			continue;
-
-		len += sprintf(buf + len, "%dmhz: %u mV\n", freq / 1000,
-			       cpu_clk[cpu]->vdd_class->vdd_uv[i] / 1000);
-	}
-
-	return len;
-}
-
-ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
-			  char *buf, size_t count)
-{
-	int i, j;
-	int ret = 0;
-	unsigned int val, cpu = 0;
-	unsigned int num_levels = cpu_clk[cpu]->vdd_class->num_levels;
-	char size_cur[4];
-
-	if (cnt) {
-		cnt = 0;
-		return -EINVAL;
-	}
-
-	for (i = 0; i < num_levels; i++) {
-		if (use_for_scaling(cpu_clk[cpu]->fmax[i] / 1000) < 0)
-			continue;
-
-		ret = sscanf(buf, "%u", &val);
-		if (!ret)
-			return -EINVAL;
-
-		if (val > CPU_VDD_MAX)
-			val = CPU_VDD_MAX;
-		else if (val < CPU_VDD_MIN)
-			val = CPU_VDD_MIN;
-
-		for (j = 0; j < NR_CPUS; j++)
-			cpu_clk[j]->vdd_class->vdd_uv[i] = val * 1000;
-
-		ret = sscanf(buf, "%s", size_cur);
-		cnt = strlen(size_cur);
-		buf += cnt + 1;
-	}
-
-	return ret;
-}
-#endif
-
 static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct clk *c;
 	int speed, pvs, pvs_ver, config_ver, rows, cpu;
-	unsigned long *freq = 0, cur_rate, aux_rate;
-	int *uv = 0, *ua = 0;
-	u32 *dscr = 0, vco_mask, config_val;
+	unsigned long *freq, cur_rate, aux_rate;
+	int *uv, *ua;
+	u32 *dscr, vco_mask, config_val;
 	int ret;
 
 	vdd_l2.regulator[0] = devm_regulator_get(dev, "l2-dig");
@@ -885,7 +767,7 @@ static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 	rows = parse_tbl(dev, table_name, 3,
 			(u32 **) &freq, (u32 **) &uv, (u32 **) &ua);
 	if (rows < 0) {
-		
+		/* Fall back to most conservative PVS table */
 		dev_err(dev, "Unable to load voltage plan %s!\n", table_name);
 		ret = parse_tbl(dev, "qcom,speed0-pvs0-bin-v0", 3,
 				(u32 **) &freq, (u32 **) &uv, (u32 **) &ua);
@@ -910,7 +792,7 @@ static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 	if (clk_init_vdd_class(dev, &krait3_clk.c, rows, freq, uv, ua))
 		return -ENOMEM;
 
-	
+	/* AVS is optional */
 	rows = parse_tbl(dev, "qcom,avs-tbl", 2, (u32 **) &freq, &dscr, NULL);
 	if (rows > 0) {
 		avs_table.rate = freq;
@@ -930,12 +812,30 @@ static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 
 	msm_clock_register(kpss_clocks_8974, ARRAY_SIZE(kpss_clocks_8974));
 
+	/*
+	 * We don't want the CPU or L2 clocks to be turned off at late init
+	 * if CPUFREQ or HOTPLUG configs are disabled. So, bump up the
+	 * refcount of these clocks. Any cpufreq/hotplug manager can assume
+	 * that the clocks have already been prepared and enabled by the time
+	 * they take over.
+	 */
 	for_each_online_cpu(cpu) {
 		clk_prepare_enable(&l2_clk.c);
 		WARN(clk_prepare_enable(cpu_clk[cpu]),
 			"Unable to turn on CPU%d clock", cpu);
 	}
 
+	/*
+	 * Force reinit of HFPLLs and muxes to overwrite any potential
+	 * incorrect configuration of HFPLLs and muxes by the bootloader.
+	 * While at it, also make sure the cores are running at known rates
+	 * and print the current rate.
+	 *
+	 * The clocks are set to aux clock rate first to make sure the
+	 * secondary mux is not sourcing off of QSB. The rate is then set to
+	 * two different rates to force a HFPLL reinit under all
+	 * circumstances.
+	 */
 	cur_rate = clk_get_rate(&l2_clk.c);
 	aux_rate = clk_get_rate(&acpu_aux_clk.c);
 	if (!cur_rate) {
@@ -967,11 +867,11 @@ static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_PERFLOCK
 unsigned msm8974_perf_acpu_table[] = {
-        652800000,  
-        883200000,  
-        1036800000, 
-        1190400000, 
-        1958400000, 
+        652800000,  /* LOWEST */
+        883200000,  /* LOW */
+        1036800000, /* MEDIUM */
+        1190400000, /* HIGH */
+        1958400000, /* HIGHEST */
 };
 
 static struct perflock_data msm8974_floor_data = {

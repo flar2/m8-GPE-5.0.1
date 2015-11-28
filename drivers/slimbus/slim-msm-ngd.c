@@ -769,6 +769,10 @@ static int ngd_allocbw(struct slim_device *sb, int *subfrmc, int *clkgear)
 				return -ENXIO;
 			}
 		}
+		
+		if (txn.len >= SLIM_MSGQ_BUF_LEN - 1)
+			return -EINVAL;
+		
 		wbuf[txn.len++] = slc->chan;
 		SLIM_INFO(dev, "slim remove chan:%d, laddr: 0x%x\n",
 			   slc->chan, sb->laddr);

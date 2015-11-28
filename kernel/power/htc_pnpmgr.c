@@ -109,6 +109,7 @@ static int thermal_final_cpu_value = 9999999;
 static int thermal_final_gpu_value = 999999999;
 static int thermal_batt_value;
 static int data_throttling_value;
+static int cpu_asn_value = 0;
 
 define_int_show(thermal_c0, thermal_c0_value);
 define_int_store(thermal_c0, thermal_c0_value, null_cb);
@@ -148,6 +149,10 @@ power_attr(thermal_final_cpu);
 define_int_show(thermal_final_gpu, thermal_final_gpu_value);
 define_int_store(thermal_final_gpu, thermal_final_gpu_value, null_cb);
 power_attr(thermal_final_gpu);
+
+define_int_show(cpu_asn, cpu_asn_value);
+define_int_store(cpu_asn, cpu_asn_value, null_cb);
+power_attr(cpu_asn);
 
 static unsigned int info_gpu_max_clk = 400000000;
 void set_gpu_clk(unsigned int value)
@@ -295,6 +300,10 @@ int pnpmgr_battery_charging_enabled(int charging_enabled)
 	return 0;
 }
 
+static int trace_trigger_value = 0;
+define_int_show(trace_trigger, trace_trigger_value);
+define_int_store(trace_trigger, trace_trigger_value, null_cb);
+power_attr(trace_trigger);
 
 define_int_show(touch_boost_duration, touch_boost_duration_value);
 define_int_store(touch_boost_duration, touch_boost_duration_value, null_cb);
@@ -414,6 +423,7 @@ static struct attribute *thermal_g[] = {
 	&thermal_final_gpu_attr.attr,
 	&thermal_batt_attr.attr,
 	&pause_dt_attr.attr,
+        &cpu_asn_attr.attr,
 	NULL,
 };
 
@@ -452,6 +462,7 @@ static struct attribute *apps_g[] = {
 	&non_activity_trigger_attr.attr,
 	&media_mode_attr.attr,
 	&app_timeout_attr.attr,
+	&trace_trigger_attr.attr,
 	NULL,
 };
 

@@ -257,7 +257,7 @@ static ssize_t voltage_level_show(struct device *dev, struct device_attribute *a
 	struct qpnp_vib *vib ;
 	time_cdev = (struct timed_output_dev *) dev_get_drvdata(dev);
 	vib = container_of(time_cdev, struct qpnp_vib, timed_dev);
-	return sprintf(buf, "[VIB] voltage input:%dmV\n", vib->vtg_level*100);
+	return scnprintf(buf, PAGE_SIZE, "[VIB] voltage input:%dmV\n", vib->vtg_level*100);
 }
 
 static ssize_t voltage_level_store(
@@ -271,7 +271,7 @@ static ssize_t voltage_level_store(
 	vib = container_of(time_cdev, struct qpnp_vib, timed_dev);
 
 	voltage_input = -1;
-	sscanf(buf, "%d ",&voltage_input);
+	voltage_input = simple_strtoul(buf, NULL, 10);
 	printk(KERN_INFO "[VIB] voltage input: %d\n", voltage_input);
 	if (voltage_input/100 < QPNP_VIB_MIN_LEVEL || voltage_input/100 > QPNP_VIB_MAX_LEVEL){
 		printk(KERN_INFO "[VIB] invalid voltage level input: %d\n",voltage_input);
@@ -289,7 +289,7 @@ static ssize_t vib_enlarge_en_show(struct device *dev, struct device_attribute *
 	struct qpnp_vib *vib ;
 	time_cdev = (struct timed_output_dev *) dev_get_drvdata(dev);
 	vib = container_of(time_cdev, struct qpnp_vib, timed_dev);
-	return sprintf(buf, "%d", vib->enlarge_vib_on);
+	return scnprintf(buf, PAGE_SIZE, "%d", vib->enlarge_vib_on);
 }
 static DEVICE_ATTR(vib_enlarge_en, S_IRUGO | S_IWUSR, vib_enlarge_en_show, NULL);
 
@@ -299,7 +299,7 @@ static ssize_t vib_enlarge_diff_value_show(struct device *dev, struct device_att
 	struct qpnp_vib *vib ;
 	time_cdev = (struct timed_output_dev *) dev_get_drvdata(dev);
 	vib = container_of(time_cdev, struct qpnp_vib, timed_dev);
-	return sprintf(buf, "%d", vib->enlarge_vib_diff_value);
+	return scnprintf(buf, PAGE_SIZE, "%d", vib->enlarge_vib_diff_value);
 }
 static DEVICE_ATTR(vib_enlarge_diff_value, S_IRUGO | S_IWUSR, vib_enlarge_diff_value_show, NULL);
 
